@@ -1,0 +1,64 @@
+{
+  "version": "0.7.0",
+  "arsenal": {
+    "Version": 1,
+    "Guid": "38c2665f-cc79-4c29-8d19-31b48ee5f2a1",
+    "Name": "Utility Support Slot",
+    "Description": "Carry a Solo Silo designator or C4 detonator alongside another support weapon. Choose normal support controls or a separate Utility Weapon keybind. Pickups follow the game's Switch Weapon On Pickup setting. Requires Bingus Shared Loader (tested with v19). Mod Options Menu and Mod Bindings Menu are optional.",
+    "Options": [
+      {
+        "Name": "Core",
+        "Description": "Required for the mod to work. Enable Core, then choose one binding mode below.",
+        "Include": [
+          "Core"
+        ],
+        "Image": "icon.png"
+      },
+      {
+        "Name": "Bindings",
+        "Description": "Choose how you switch to your utility weapon.",
+        "SubOptions": [
+          {
+            "Name": "Default Bindings",
+            "Description": "Swap between your utility and support weapon using your normal support binding while support is drawn. On controller, hold the weapon-switch button while support is equipped.",
+            "Include": [
+              "DefaultBindings"
+            ],
+            "Image": "icon.png"
+          },
+          {
+            "Name": "Dedicated Key",
+            "Description": "Draw your utility directly with 6 by default. Change the key in utility_support_slot.ini or assign Utility Weapon through Mod Bindings Menu.",
+            "Include": [
+              "DedicatedKey"
+            ],
+            "Image": "icon.png"
+          }
+        ],
+        "Image": "icon.png"
+      }
+    ],
+    "IconPath": "icon.png"
+  },
+  "mod_options": {
+    "label": "Binding Mode",
+    "mod": "Utility Support Slot",
+    "id": "utility_support_slot.binding_mode",
+    "choices": [
+      "Default Bindings",
+      "Dedicated Key"
+    ],
+    "default": "installed Arsenal mode; applied menu choice takes precedence",
+    "description": "Default Bindings swaps weapons using your normal support controls. Dedicated Key draws the utility with 6 by default or your Utility Weapon binding. Press APPLY to change modes."
+  },
+  "mod_bindings": {
+    "label": "Utility Weapon",
+    "category": "Utility Support Slot",
+    "id": "utility_support_slot.draw_utility",
+    "default": null
+  },
+  "ini": {
+    "utility_key": "6",
+    "log_level": "error"
+  }
+}

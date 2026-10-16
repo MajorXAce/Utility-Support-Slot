@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_revision": "a0329b9ac2770e41043643d95cc3307a48b89b0d",
+  "source_revision": "b1318226a98a52e3a6f0ef61a0516f6ef1cd72ea",
   "version": "0.7.0",
   "input_state": "committed",
   "files": {
@@ -19,7 +19,7 @@
     "LICENSE": "5c7a9885a99192833a9b11a5a3085487b4c68f4a6af0ee14775eaaebc679b933",
     "PLAYER_FACING_CONFIG.json": "540de5a5f99a63e72fce9c32b0e15d1ecdefecf6b77b3ef29eac06f5b9e91f6d",
     "PLAYER_FACING_CONFIG.md": "d9bae18ad26b0835e740cc505e2ae6808ab076aead60f0ce27e4a5b8578057b2",
-    "README.md": "6839b7f8a65e089598c4f18bc1078fd47918c4d27aa36bc909affc5bcba1e716",
+    "README.md": "77b34bfc9ce7f8fa7e503145b303bb29bee2f80bacf8753457ffb035ff2b1448",
     "Source/address_resolver.lua": "16d4e86e9e6b7ccca59643a4c84fa41c57ddf09e59dedc7d2fd410325c28f25e",
     "Source/binding_mode_options.lua": "4f3b3e3a64435ebc492c6357e5ce3887cdbe9823b9baabff6e1864daf8541d99",
     "Source/build_compatibility.lua": "9c3257a2b24cfd86f3ad7866fc5f87a44699b27268a8d2c118f7917d4b092350",
@@ -70,5 +70,5 @@
     "tools/player_config.py": "f4b556702b82644451fe5b12ae0fa09f6df89bf9873d02feb86e8da3d0568d14",
     "tools/verify_public.py": "f6de8d5d64caa0276143691cdf59f77885e6606ccbafa54e0d5629be8a4b7ae3"
   },
-  "tree_sha256": "daecea3ac5b165053a3ca2e75f79144185b1006604b6e4c5d81004bc2c67d02c"
+  "tree_sha256": "020788b1b16f0f2f2ebc28b87386e98dd8560771650a8cfdeb02366d005a1efc"
 }

@@ -1,25 +1,28 @@
 # Utility Support Slot v0.7.0
 
-This mod allows you to carry one utility (Solo Silo designator or C4 detonator) alongside another
-support weapon. Another utility replaces the utility; another ordinary support
-weapon replaces the ordinary one. Two weapons of the same class do not form
-a pair.
+This mod allows you to carry one utility (Solo Silo designator or C4 detonator)
+alongside another support weapon. Two utilities or two ordinary support weapons
+do not form a pair, so you cannot carry two EATs, for example.
+
+This mod is intended for single-player and private lobbies. Please respect other
+players and check with your group before using it.
 
 ## Installation and requirements
 
-Requires **Bingus Shared Loader; tested with v19**. Import this ZIP into Arsenal, enable **Core**
-and choose exactly one mode under **Bindings**, then deploy and restart the game.
-Core alone uses Default Bindings. Do not install both binding choices manually.
-The root folders are `Core/`, `DefaultBindings/` and `DedicatedKey/`.
+Requires **[Bingus Shared Loader](https://github.com/CowboyBingus/BingusSharedLoader/releases)**;
+tested with **v19**. Import the mod ZIP into your mod manager (for example,
+Arsenal), enable **Core** and choose exactly one mode under **Bindings**, then
+deploy and restart the game. Core alone uses Default Bindings. Do not install
+both binding choices manually.
 
-**Mod Options Menu** and **Mod Bindings Menu v2+** are optional (but recommended) and installed
-separately.
+**Mod Options Menu** and **Mod Bindings Menu v2+** are optional (but recommended)
+and installed separately.
 
 ## Controls
 
-**Default Bindings:** press your support binding while support is already drawn
-to swap the pair. On controller, hold the weapon-switch button while support is
-equipped.
+**Default Bindings:** press your support binding while your support weapon is
+already drawn to swap the pair. On controller, hold the weapon-switch button
+while support is drawn.
 
 **Dedicated Key:** press **6** by default, or assign **Utility Weapon** through
 Mod Bindings Menu, to draw the utility directly. Pressing it again leaves the
@@ -27,47 +30,58 @@ utility drawn, like vanilla. The other weapon keys behave as normal. If you only
 have a utility weapon, it stays in the support slot and can be drawn with either
 the support weapon binding or the utility weapon binding.
 
-With **Mod Options Menu**, open Options > MODS > Utility Support Slot, choose
-Binding Mode and press APPLY. The saved, applied menu choice takes priority over
-Arsenal while the menu is available. Without it, Arsenal supplies the mode.
-Release the control after changing modes before using it again.
+With **Mod Options Menu**, open **Options > MODS > Utility Support Slot**, choose
+**Binding Mode** and press **APPLY**. The saved, applied menu choice takes priority
+over your mod manager while the menu is available. Without it, the mod uses the
+mode selected in your mod manager. The menu lets you change modes in-game;
+release the control after changing modes before using it again.
 
-With **Mod Bindings Menu**, open the MODS tab in the keyboard/controller options
-and bind **Utility Weapon** under Utility Support Slot. It starts unbound. Once
-you assign and use it, that binding replaces the INI shortcut for the session.
-If the menu isn't installed or becomes unavailable, the INI shortcut is used.
-Clearing the menu binding after takeover requires a restart to return to the INI.
-The action is used only in Dedicated Key mode.
+With **Mod Bindings Menu**, open the **MODS** tab in the keyboard/controller
+options and bind **Utility Weapon** under **Utility Support Slot**. It starts
+unbound. Once you assign and use it, that binding replaces the INI shortcut for
+the session. If the menu isn't installed or becomes unavailable, the INI shortcut
+is used. If you clear a menu binding after using it, restart the game to use the
+INI shortcut again. The binding is used only in Dedicated Key mode.
 
 ## Pickup and recovery
 
-The **Switch Weapon On Pickup** game setting controls whether a pickup is
-drawn. With No, the mod restores the previously selected weapon; replacing an
-already drawn utility keeps the new utility drawn. Replacing either member keeps
-the other member and drops the old weapon like vanilla.
-Dropping or expending a member restores the survivor; dropping that final member
-then leaves the pair empty. Existing refill and death-recovery handling remains.
+Pickups follow the game's **Switch Weapon On Pickup** setting. With **No**, your
+previously selected weapon is restored; replacing an already drawn utility keeps
+the new utility drawn. Replacing either weapon keeps the other one and drops the
+old weapon like vanilla. Dropping or expending one weapon restores the remaining
+weapon. Death recovery is also supported.
 
-## Multiplayer and known limitations
+## Known limitations and multiplayer support
+
+The game still has one support slot. The mod tracks the other weapon separately
+and keeps it attached to your character, which is why some behavior differs from
+vanilla.
 
 Multiplayer support was tested with the mod user **hosting a two-player game**.
 The other player saw both stored weapons and correct draws, including a run with
 Utility Support Slot disabled for the other player. Using the mod as a joining
 player, larger groups, and completely vanilla observers haven't been tested.
 
+- Resupplying from another player's supply backpack will not refill the weapon
+  being stored by the mod.
 - Your primary weapon may briefly appear during a swap or replacement.
 - The mod hides extra pickup messages caused by its weapon handling. An incorrect
   utility pickup message can occasionally appear after replacing an ordinary
   support weapon while primary or secondary remains held with **Switch Weapon On
   Pickup** set to **No**. Weapon handling worked correctly in the tested cases;
-  a fix for the message is planned for a future update.
-- Replacements are occasional heavier operations; a noticeable hitch remains
-  possible. Performance is something that will be an ongoing project.
-- If something interrupts a weapon swap or pickup, the mod may stop handling weapons to avoid making things worse. Changes already made will remain. Recovery from these interruptions hasn’t been tested in-game yet, so you may need to start a new mission if the mod stops responding.
+  a fix for missed messages is planned for a future update.
+- Replacing support weapons or utilities can cause a noticeable hitch. Normal
+  swaps were stable in my testing; performance work will continue.
+- If something interrupts a weapon swap or pickup, the mod may stop handling
+  weapons to avoid making things worse. Changes already made will remain.
+  Recovery from these interruptions hasn't been tested in-game yet, so you may
+  need to start a new mission if the mod stops responding.
 
 ## INI and logging
 
-Created on startup in either binding mode:
+An INI file is created on startup where you can change the shortcut key and
+logging level:
+
 `%APPDATA%\Arrowhead\Helldivers2\utility_support_slot.ini`
 
 ```ini
@@ -75,15 +89,18 @@ utility_key=6
 log_level=error
 ```
 
-Edit and restart the game. Existing settings/comments are preserved; missing
-settings are appended. Invalid values use the defaults above. The keyboard
-fallback accepts a-z, 0-9, f1-f12, numpad0-numpad9, page up/down, home/end and
-insert/delete. Saved older keys, including Page Up, are not overwritten.
+Edit the settings and restart the game. You can change `utility_key` for
+Dedicated Key mode if you aren't using Mod Bindings Menu. It accepts a-z, 0-9,
+f1-f12, numpad0-numpad9, page up/down, home/end and insert/delete.
 
-Logging uses one **UtilitySupportSlot.log**, without a mod-defined size cap.
-`error` is the default and may leave a clean session's file empty; `info` includes
-readiness/mode messages and `debug` includes detailed gameplay/HUD/refill evidence.
-For an issue report, include the version, host/client role, both weapons, pickup
+Find **UtilitySupportSlot.log** in Bingus Shared Loader's log folder:
+
+`%LOCALAPPDATA%\CowboyBingus\Helldivers2\Logs\UtilitySupportSlot.log`
+
+`error` is the default and reports failures, so a clean session may leave an
+empty file. `info` includes readiness/mode messages, and `debug` includes detailed
+weapon, HUD and resupply events. For an issue report, include the mod version,
+whether you were hosting or joining, both weapons, the **Switch Weapon On Pickup**
 setting, binding mode, what each player saw and the relevant log. Raising logging
 requires an INI edit and restart.
 
@@ -96,15 +113,15 @@ Game Studios or Sony Interactive Entertainment.
 
 ## Credits
 
-Created by **MajorXAce**. The gameplay logic is mine, with **GPT-6.1 Sol** helping
-with research, implementation, debugging, and documentation.
+Created by **MajorXAce**. The gameplay logic is mine, but I had **GPT-6.1 Sol**
+help with research, implementation, debugging, and documentation.
 
-Thanks to the creators of **Bingus Shared Loader**, **Mod Options Menu**, and
-**Mod Bindings Menu**. Bingus Shared Loader provides mod loading and logging,
-and this mod wouldn't exist without it. The optional menus make configuration
-and keybinding easier.
+Big thanks to **CowboyBingus**, the creator of **Bingus Shared Loader**,
+**Mod Options Menu**, and **Mod Bindings Menu**. Bingus Shared Loader provides
+mod loading and logging, and this mod wouldn't exist without it. The optional
+menus make configuration and keybinding easier.
 
-I'd also like to thank the creators of **HD2Runtime** and **LinksLinkToMemory**
-for their development and research tools. They helped me inspect live game state,
-understand weapon and multiplayer behavior, and run experiments throughout
-development.
+I'd also like to thank **SkyeShade**, creator of **HD2Runtime**, and **notzelda**,
+creator of **LinksLinkToMemory**, for their development and research tools. They
+helped me inspect live game state, understand weapon and multiplayer behavior,
+and run experiments throughout development.

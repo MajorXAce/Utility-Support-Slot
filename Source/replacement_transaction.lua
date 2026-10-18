@@ -26,13 +26,9 @@ local function replacement_transaction_services(guard_queue)
     end
     local function peers()
         local session=must(ptr(game+0x347CEF0),'CONTROL_SESSION')
-        must(u32(api.read(session+0x162D8,4),0)==2,'CONTROL_PEER_COUNT')
-        local self=api.read(session+0xB398,8)
-        local raw=must(api.read(session+0x162E0,16),'CONTROL_PEERS')
-        local a,b=raw:sub(1,8),raw:sub(9,16)
-        must(a==self and b~=self and b~=string.rep(string.char(0),8),'CONTROL_PEER_ORDER')
-        if b<a then a,b=b,a end
-        return (a..b):gsub('.',function(c)return string.format('%02x',c:byte())end)
+        local roster=inventory_session_peers(api.read,u32,session)
+        must(roster.count>1,'CONTROL_MULTIPLAYER_REQUIRED')
+        return roster.context_key:gsub('.',function(c)return string.format('%02x',c:byte())end)
     end
     local s={clock=function()return tonumber(kernel.uss_win1_GetTickCount64())end,
         emit=emit,pause=function(w)if w and pair==w.pair then paused=true end end}
@@ -179,7 +175,7 @@ local function replacement_transaction_services(guard_queue)
         replacement_drop_calls=replacement_drop_calls+1
         s.validate(w,sample(),'DROPPED')
     end
-    function s.finish(w)
+    function s.finish(w,queue_draw)
         route()
         s.validate(w,sample(),'DROPPED')
         if w.replacing_utility then pair.utility=w.new;utility_id=w.new_id
@@ -193,6 +189,15 @@ local function replacement_transaction_services(guard_queue)
         local p=must(sample(),'CONTROL_FINAL_INVENTORY')
         must(same_context(w.context,p) and check_pair(p) and p.support==w.new
             and parent(w.old,w.old_id)==0,'CONTROL_FINAL_CONTEXT')
+        if w.restore_kept and queue_draw then
+            -- Final formation succeeded, but restoring the retained member can
+            -- start another transition. Let the shared finite service finish it.
+            must(queue_draw(p,'RETAINED_MEMBER',w.selected,nil,w.kept,w.kept_id),
+                'REPLACEMENT_RETAINED_QUEUE_FAILED')
+            must(formation_pending,'REPLACEMENT_RETAINED_QUEUE_UNAVAILABLE')
+            formation_pending.replacement_result={incoming=w.new,old=w.old,kept=w.kept}
+            return
+        end
         if w.restore_kept then
             -- Reuse the normal guarded draw/publication path after new-pair
             -- formation. Do not draw the incoming weapon just to select slot3.

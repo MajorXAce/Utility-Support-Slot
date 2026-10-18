@@ -1,19 +1,26 @@
--- Pair setup and joined-client draws may wait across updates for primary readiness.
+-- Pair setup and multiplayer draws wait across updates for primary readiness.
 -- Keep the original operation order and publish the actual incoming member before
 -- drawing. A refusal before entry can wait; an uncertain/failed native entry cannot.
 local function queue_formation(p,order,selected,pickup_setting,draw_target,draw_id)
  if not publication then return false end
  local utility_exit=order=='UTILITY_EXIT'
- local managed_draw=order=='CLIENT_DRAW'
+ local retained=order=='RETAINED_MEMBER'
+ local replacement=order=='REPLACEMENT'
+ local managed_draw=order=='PAIR_DRAW' or retained
  local state=publication.status()
+ if state.mission and state.eligible and (state.disabled or state.suspended)then
+  paused=true;emit('PAUSED PAIR_PUBLICATION_UNAVAILABLE');return true
+ end
  if utility_exit or managed_draw then
   -- This is an existing pair whose local support membership would otherwise
   -- change without an incoming publication. Unsupported scopes retain Core's
   -- original local restoration; do not invent a new network contract here.
-  if not state.mission or not (state.host or state.joined_client) or not state.formed
-   or state.disabled or state.suspended then return false end
+  if not state.mission or not (state.host or state.joined_client) or not state.eligible then return false end
+  if not state.formed or state.disabled or state.suspended then
+   paused=true;emit('PAUSED PAIR_PUBLICATION_UNAVAILABLE');return true
+  end
   if managed_draw then
-   if not state.joined_client or selected~=3 then return false end
+   if (not retained and selected~=3) or (selected~=1 and selected~=2 and selected~=3) then return false end
    local expected=draw_target==pair.utility and utility_id
     or draw_target==pair.support and pair.support_id
    if not expected or draw_id~=expected then return false end
@@ -28,12 +35,21 @@ local function queue_formation(p,order,selected,pickup_setting,draw_target,draw_
   {target=pair.utility,id=utility_id,label='CAPTURE_UTILITY_FIRST',stage='UTILITY_FIRST_CAPTURE'},
   {target=pair.support,id=pair.support_id,label='RESTORE_UTILITY_FIRST_SUPPORT',stage='POST_ATTACH_INCOMING'},
  } or {{target=pair.support,id=pair.support_id,label='STORE_NEW_UTILITY',stage='POST_ATTACH_INCOMING'}}
- if not managed_draw and not utility_exit and not utility_first and pickup_setting then
+ if replacement then
+  -- Publish the new lifetime before restoring its requested member/selection.
+  -- A current-slot step sends only: it must not repeat native attachment.
+  steps={{target=pair.support,id=pair.support_id,label='STORE_REPLACEMENT_UTILITY',
+   stage='POST_ATTACH_INCOMING',current=p.support==pair.support}}
+  if draw_target==pair.utility then
+   steps[#steps+1]={target=pair.utility,id=utility_id,label='REPLACEMENT_RESTORE',stage='POST_ATTACH_INCOMING'}
+  end
+ end
+ if not managed_draw and not replacement and not utility_exit and not utility_first and pickup_setting then
   steps[#steps+1]={target=pair.utility,id=utility_id,label='DRAW_UTILITY',stage='POST_ATTACH_INCOMING'}
  end
  formation_pending={pair=pair,context=p,epoch=state.epoch,host_role=state.host,utility_id=utility_id,
   ordinary_id=pair.support_id,support=p.support,steps=steps,index=1,selected=selected,origin_selected=p.active,
-  deadline=tonumber(kernel.uss_win1_GetTickCount64())+2000,order=order,pickup=pickup_setting,utility_exit=utility_exit,managed_draw=managed_draw}
+  deadline=tonumber(kernel.uss_win1_GetTickCount64())+2000,order=order,pickup=pickup_setting,utility_exit=utility_exit,managed_draw=managed_draw,replacement=replacement}
  -- The pair remains owned by this work record until completion or cancellation.
  pending_utility=nil
  emit('FORMATION_DEFERRED_BEGIN ORDER='..order..' SELECTED='..selected)
@@ -44,7 +60,11 @@ end
 local function queue_lone_publication(p,target,id,outgoing,outgoing_id)
  if not publication then return end
  local recovery=publication.begin_lone(p,target,id,outgoing,outgoing_id)
- if not recovery then return end -- Solo/unsupported scope keeps local behavior.
+ if not recovery then
+  local state=publication.status()
+  if state.mission and state.eligible then paused=true;emit('PAUSED LONE_PUBLICATION_UNAVAILABLE')end
+  return -- Solo keeps its original local behavior.
+ end
  formation_pending={lone=recovery,context=p,selected=p.active,
   deadline=tonumber(kernel.uss_win1_GetTickCount64())+2000}
  emit('LONE_PUBLICATION_BEGIN TARGET='..target..' OUTGOING='..outgoing)
@@ -101,15 +121,16 @@ local function service_formation(p,now,input)
  local ok,why=pcall(function()
   local state=publication.status()
   if work.utility_exit and input then error('INPUT_DURING_UTILITY_EXIT',0)end
-  if work.managed_draw and input then error('INPUT_DURING_CLIENT_DRAW',0)end
+  if (work.managed_draw or work.replacement) and input then error('INPUT_DURING_PAIR_DRAW',0)end
   if now>=work.deadline then error('TIMEOUT',0)end
   if not state.mission or not (state.host or state.joined_client) or state.host~=work.host_role or state.epoch~=work.epoch
-   or state.disabled or state.suspended or paused or down or pair~=work.pair
+   or state.disabled or state.suspended or ((work.managed_draw or work.replacement) and not state.eligible)
+   or paused or down or pair~=work.pair
    or not same_context(work.context,p) or not can_switch(p)
    or utility_id~=work.utility_id or pair.support_id~=work.ordinary_id
    or identity(pair.utility)~=work.utility_id or identity(pair.support)~=work.ordinary_id
    or p.support~=work.support then error('CONTEXT_OR_PICKUP_CHANGED',0)end
-  if (work.utility_exit or work.managed_draw) and (p.primary~=work.context.primary or p.secondary~=work.context.secondary
+  if (work.utility_exit or work.managed_draw or work.replacement) and (p.primary~=work.context.primary or p.secondary~=work.context.secondary
    or(not work.primary_requested and p.active~=(work.origin_selected or work.selected)))then
    error('UTILITY_EXIT_SELECTION_CHANGED',0)
   end
@@ -135,7 +156,11 @@ local function service_formation(p,now,input)
    -- Consume attachment before entry; failures cancel, never retry it.
    work.attached=true
    work.outgoing=p.support
-   if not switch_entity(p,step.target,step.id,false,step.label,work.managed_draw)then error('ATTACH_FAILED',0)end
+   if step.current then
+    if p.support~=step.target then error('CURRENT_MEMBER_CHANGED',0)end
+   elseif not switch_entity(p,step.target,step.id,false,step.label,work.managed_draw or work.replacement)then
+    error('ATTACH_FAILED',0)
+   end
    work.support=step.target
   end
   local after=sample()
@@ -157,17 +182,24 @@ local function service_formation(p,now,input)
   last_support={entity=pair.support,id=pair.support_id};pending_utility=nil
   formation_pending=nil
   if work.managed_draw then
-   -- The attachment ran while primary was selected. Acknowledge only after
-   -- the final draw; the HUD callback freshly checks selection and pair identity.
+   -- Acknowledge only after final selection; never report primary as the draw.
    local acknowledge=_G.UtilitySupportSlotContext.acknowledge_inventory_change
-   if acknowledge then acknowledge(work.outgoing,step.target,step.label)end
-   emit('CLIENT_DRAW_COMPLETE TARGET='..step.target..' ACTIVE='..work.selected)
+   if acknowledge and work.selected==3 then acknowledge(work.outgoing,step.target,step.label)end
+  end
+  if work.replacement_result then
+   local result=work.replacement_result
+   trace_replacement('COMPLETE',nil,result.incoming,result.old,result.kept)
+   emit('REPLACE_TYPED DROPPED='..result.old..' RETAINED='..result.kept..' NEW_REAL='..step.target)
+  end
+  if work.managed_draw then
+   emit('PAIR_DRAW_COMPLETE TARGET='..step.target..' ACTIVE='..work.selected)
    return
   end
   if work.utility_exit then
    emit('UTILITY_EXIT_COMPLETE SUPPORT='..pair.support..' RESTORED_SELECTED='..work.selected)
    return
   end
+  if work.replacement then emit('REPLACEMENT_PUBLICATION_COMPLETE ACTIVE='..work.selected);return end
   emit('PAIR_READY ORDER='..work.order..' UTILITY='..pair.utility..' SUPPORT='..pair.support
    ..' SWITCH_WEAPON_ON_PICKUP='..tostring(work.pickup))
  end)

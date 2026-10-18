@@ -956,6 +956,38 @@ local function inventory_publication_pins()
     return pins
 end
 -- USS-SOURCE-END inventory_publication_pins.lua
+-- USS-SOURCE-BEGIN inventory_session_peers.lua
+-- Session peer IDs are opaque eight-byte values, not entity handles.
+-- Read the full normal squad roster once. Keys ignore array order but retain
+-- local/host identity, so a live transaction cannot silently change authority.
+local function inventory_session_peers(read,uint,session)
+    local function field(at,size)
+        local bytes=read(at,size)
+        if not bytes or #bytes~=size then error('SESSION_PEER_READ',0)end
+        return bytes
+    end
+    local count=uint(field(session+0x162D8,4),0)
+    if count<1 or count>4 then error('SESSION_PEER_COUNT',0)end
+    local self=field(session+0xB398,8)
+    local host=field(session+0xB3A8,8)
+    local raw=field(session+0x162E0,count*8)
+    local zero=string.rep(string.char(0),8)
+    if self==zero then error('SELF_PEER_MISSING',0)end
+    local members,seen,remotes={},{},{}
+    for offset=1,#raw,8 do
+        local id=raw:sub(offset,offset+7)
+        if id==zero or seen[id]then error('SESSION_PEER_IDENTITY',0)end
+        members[#members+1]=id;seen[id]=true
+        if id~=self then remotes[#remotes+1]=id end
+    end
+    if not seen[self]then error('SESSION_SELF_MISSING',0)end
+    if host~=zero and not seen[host]then error('SESSION_HOST_MISSING',0)end
+    table.sort(members)
+    local key=table.concat(members)
+    return {count=count,self=self,host=host,remotes=remotes,key=key,
+        context_key=self..host..key,is_host=self==host or host==zero}
+end
+-- USS-SOURCE-END inventory_session_peers.lua
 -- USS-SOURCE-BEGIN inventory_publication_dispatch_pins.lua
 -- Captured dispatch bodies retained from snapshot_component_eligibility.lua.
 -- These bytes identify code; they do not independently prove ABI or delivery.
@@ -1008,21 +1040,25 @@ return function(api,field,pointer,root,registry,records,session,image)
     for _,pin in ipairs(replacement_queue_pins)do
         must(api.target_code(image.base+pin.rva,image,#pin.bytes)==pin.bytes,'QUEUE_CODE_PIN')
     end
-    must(u32(field(session+0x162D8,4),0)==2,'QUEUE_TWO_PEERS')
-    local self=field(session+0xB398,8)
-    local peers=field(session+0x162E0,16);local remote=peers:sub(9,16)
-    local zero=string.rep(string.char(0),8)
-    must(self~=zero and peers:sub(1,8)==self and remote~=zero and remote~=self,'QUEUE_PEER_ORDER')
+    local roster=inventory_session_peers(field,u32,session)
+    must(roster.count>1,'QUEUE_MULTIPLAYER_REQUIRED')
+    local required,found={},{}
+    for _,id in ipairs(roster.remotes)do required[id]=true end
     local count=u32(field(provider+0xA0,4),0)
     must(count>=1 and count<=32,'QUEUE_PEER_LIMIT')
-    local array=pointer(provider+0xA8);local found
+    local array=pointer(provider+0xA8)
     for i=0,count-1 do
         local entry=pointer(array+i*8)
-        if field(entry+0x10,8)==remote then
-            must(not found,'QUEUE_DUPLICATE_PEER');found=entry
+        local id=field(entry+0x10,8)
+        if required[id]then
+            must(not found[id],'QUEUE_DUPLICATE_PEER')
+            must(field(entry+0x1878C,1):byte()==0,'QUEUE_EXISTING_OPEN_PEER_REQUIRED')
+            found[id]=true
         end
     end
-    must(found and field(found+0x1878C,1):byte()==0,'QUEUE_EXISTING_OPEN_PEER_REQUIRED')
+    for _,id in ipairs(roster.remotes)do
+        must(found[id],'QUEUE_EXISTING_OPEN_PEER_REQUIRED')
+    end
     -- Native append retains its own capacity/failure policy. No queue cursor,
     -- counter, allocation or lock is changed or interpreted as an acknowledgment.
     return true
@@ -1423,7 +1459,7 @@ end
 -- USS-SOURCE-END replacement_primary_boundary.lua
 
 -- USS-SOURCE-BEGIN inventory_publication.lua
--- Host/two-player behavior passed scoped checks; joined-owner integration is a candidate.
+-- Native publication for a normal squad; larger-roster handling is fixture-tested.
 -- Automatic inventory publication, independent of the research workbench.
 -- A member handle, wire ID, resource identity and selected slot are distinct.
 -- Both roles use the same identity, recipient and native-entry contract.
@@ -1525,20 +1561,11 @@ local function inventory_publication(services)
         local mode = pointer(game+0x33266A0)
         local session = pointer(game+0x347CEF0)
         local mission = uint(read(state+0xAC21C,4),0)==4 and uint(read(mode+8,4),0)==1
-        local self = read(session+0xB398,8)
-        local host = read(session+0xB3A8,8)
-        local zero = string.rep(string.char(0),8)
-        if self == zero then error('SELF_PEER_MISSING',0) end
-        local is_host = self==host or host==zero
-        -- A joined owner may publish only to its one known host. Keep actual
-        -- host identity separate from eligibility used by the transaction guards.
-        local joined_client = false
-        if not is_host and host~=zero and uint(read(session+0x162D8,4),0)==2 then
-            local peers=read(session+0x162E0,16)
-            joined_client=peers:sub(1,8)==self and peers:sub(9,16)==host
-        end
-        local eligible = is_host or joined_client
-        return mission, eligible, session, self, state, is_host, joined_client
+        if not mission then return false,false,session,nil,state,false,false end
+        local peers=inventory_session_peers(read,uint,session)
+        local joined_client=not peers.is_host
+        local eligible=peers.count>1
+        return mission,eligible,session,peers.self,state,peers.is_host,joined_client,peers
     end
     local function update_epoch(mission)
         if mission and not last_mission then epoch=epoch+1;record=nil;replacement_primary.close()end
@@ -1569,8 +1596,8 @@ local function inventory_publication(services)
             if not supported_pair(pair) or formed_pair(pair)
                 or pair.owner~=owner.owner or pair.avatar~=owner.avatar
                 or _G.UtilitySupportSlotContext~=services.context then return false end
-            local mission,eligible,session=scope()
-            return mission and eligible and uint(read(session+0x162D8,4),0)==2
+            local mission,eligible=scope()
+            return mission and eligible
         end)
         return ok and eligible or false
     end
@@ -1652,7 +1679,7 @@ local function inventory_publication(services)
     local function capture(stage,include_slot_drop,recovery)
         latest_guard=nil
         reads=0;fingerprint={}
-        local mission, eligible, session, self, game_state = scope()
+        local mission, eligible, session, self, game_state, is_host, joined_client, roster = scope()
         if not mission or not eligible then error('OWNER_MISSION_REQUIRED',0) end
         if _G.UtilitySupportSlotContext~=services.context then error('CONTEXT_CHANGED',0) end
         local owner = require_value(services.sample_inventory(),'INVENTORY_MISSING')
@@ -1675,13 +1702,7 @@ local function inventory_publication(services)
             error('OWNER_INVENTORY_CHANGED',0)
         end
         character_primary(owner,game_state,stage)
-        local count = uint(read(session+0x162D8,4),0)
-        if count~=2 then error('TWO_PLAYER_SCOPE_REQUIRED',0) end
-        local peers = read(session+0x162E0,16)
-        local zero = string.rep(string.char(0),8)
-        if peers:sub(1,8)~=self or peers:sub(9,16)==zero or peers:sub(9,16)==self then
-            error('RECIPIENT_SELF_ORDER',0)
-        end
+        local peers=roster.context_key
         if recovery and peers~=recovery.peers then error('LONE_PEERS_CHANGED',0) end
         local auxiliary=pointer(session+0x1F860) -- Native-owned dispatch object.
         local helpers = pointer(game+0x33263E8)
@@ -1786,11 +1807,17 @@ local function inventory_publication(services)
         if after.row~=owner.row or after.address~=owner.address or after.avatar~=owner.avatar
             or after.owner~=owner.owner or after.inventory~=owner.inventory
             or services.current_pair()~=pair then error('CAPTURE_RECHECK',0) end
+        -- A join/leave during the dependency reads must not become an entry
+        -- using a stale recipient set, even if the inventory itself is unchanged.
+        if pointer(game+0x347CEF0)~=session
+            or inventory_session_peers(read,uint,session).context_key~=roster.context_key then
+            error('SESSION_PEERS_CHANGED',0)
+        end
         local thread = services.thread_id()
         if not thread or thread<1 or game_thread and thread~=game_thread then error('GAME_THREAD_CHANGED',0) end
         local key=table.concat({session,mapping,owner.owner,owner.avatar,owner.inventory,
             recovery and recovery.outgoing or pair.utility,recovery and recovery.target or pair.support},':')..peers
-        local result={owner=owner,pair=pair,recovery=recovery,wires=wires,peer_key=peers,key=key,session=session,
+        local result={owner=owner,pair=pair,recovery=recovery,wires=wires,peer_key=peers,peer_ids=roster.key,key=key,session=session,
             fingerprint=table.concat(fingerprint,'|'),thread=thread}
         fingerprint=nil
         return result
@@ -1900,11 +1927,9 @@ local function inventory_publication(services)
         emit('RETURNED KIND='..kind..' AVATAR='..fresh.owner.avatar..' MEMBER='..fresh.owner.support
             ..' CALLS='..returned..' EPOCH='..epoch..' DELIVERY_PROVEN=false')
         if kind=='FORMATION' then
-            local a,b=fresh.peer_key:sub(1,8),fresh.peer_key:sub(9,16)
-            if b<a then a,b=b,a end
             record.targets={avatar=fresh.wires.avatar,primary=fresh.wires.primary,
                 utility=fresh.wires.utility,ordinary=fresh.wires.ordinary,
-                peers=(a..b):gsub('.',function(c)return string.format('%02x',c:byte())end)}
+                peers=fresh.peer_ids:gsub('.',function(c)return string.format('%02x',c:byte())end)}
         end
         return true
     end
@@ -2033,7 +2058,7 @@ local function inventory_publication(services)
         end
     end)
     if not ok then disabled=true;note(tostring(reason)) end
-    emit('READY MODE=AUTOMATIC SCOPE=HOST_OR_JOINED_TWO_PLAYERS_TYPED_SUPPORT_PAIR ENABLED='..tostring(not disabled)..' VERSION=29')
+    emit('READY MODE=AUTOMATIC SCOPE=HOST_OR_JOINED_MULTIPLAYER_TYPED_SUPPORT_PAIR ENABLED='..tostring(not disabled)..' VERSION=32')
     return publisher
 end
 -- USS-SOURCE-END inventory_publication.lua
@@ -2525,7 +2550,11 @@ local function switch_entity(p,target,target_id,draw,label,defer_ack)
     emit('REPLACEMENT_DEFERRED_REFUSED ACTION='..label..' REASON='..tostring(reason));return false
    end
   elseif draw or label=='RESTORE_UTILITY_FIRST_SUPPORT' then
-   publication.boundary(after)
+   local accepted,reason=publication.boundary(after)
+   local state=publication.status and publication.status()
+   if not accepted and state and state.mission and state.eligible then
+    paused=true;emit('PAUSED INCOMING_PUBLICATION_REFUSED REASON='..tostring(reason));return false
+   end
   elseif label=='CAPTURE_UTILITY_FIRST' then
    -- This recovered utility may have no observer parent yet. Publish it while
    -- it occupies the real support slot, before restoring/publishing ordinary.
@@ -2556,7 +2585,8 @@ local function publish_replacement_pair(p)
  end
  local current=sample()
  if not same_context(p,current) or current.support~=pair.support or not check_pair(current) then return nil end
- publication.formation_boundary(current)
+ local accepted=publication.formation_boundary(current)
+ if not accepted then return nil end
  return current
 end
 
@@ -2874,13 +2904,9 @@ local function replacement_transaction_services(guard_queue)
     end
     local function peers()
         local session=must(ptr(game+0x347CEF0),'CONTROL_SESSION')
-        must(u32(api.read(session+0x162D8,4),0)==2,'CONTROL_PEER_COUNT')
-        local self=api.read(session+0xB398,8)
-        local raw=must(api.read(session+0x162E0,16),'CONTROL_PEERS')
-        local a,b=raw:sub(1,8),raw:sub(9,16)
-        must(a==self and b~=self and b~=string.rep(string.char(0),8),'CONTROL_PEER_ORDER')
-        if b<a then a,b=b,a end
-        return (a..b):gsub('.',function(c)return string.format('%02x',c:byte())end)
+        local roster=inventory_session_peers(api.read,u32,session)
+        must(roster.count>1,'CONTROL_MULTIPLAYER_REQUIRED')
+        return roster.context_key:gsub('.',function(c)return string.format('%02x',c:byte())end)
     end
     local s={clock=function()return tonumber(kernel.uss_win1_GetTickCount64())end,
         emit=emit,pause=function(w)if w and pair==w.pair then paused=true end end}
@@ -3027,7 +3053,7 @@ local function replacement_transaction_services(guard_queue)
         replacement_drop_calls=replacement_drop_calls+1
         s.validate(w,sample(),'DROPPED')
     end
-    function s.finish(w)
+    function s.finish(w,queue_draw)
         route()
         s.validate(w,sample(),'DROPPED')
         if w.replacing_utility then pair.utility=w.new;utility_id=w.new_id
@@ -3041,6 +3067,15 @@ local function replacement_transaction_services(guard_queue)
         local p=must(sample(),'CONTROL_FINAL_INVENTORY')
         must(same_context(w.context,p) and check_pair(p) and p.support==w.new
             and parent(w.old,w.old_id)==0,'CONTROL_FINAL_CONTEXT')
+        if w.restore_kept and queue_draw then
+            -- Final formation succeeded, but restoring the retained member can
+            -- start another transition. Let the shared finite service finish it.
+            must(queue_draw(p,'RETAINED_MEMBER',w.selected,nil,w.kept,w.kept_id),
+                'REPLACEMENT_RETAINED_QUEUE_FAILED')
+            must(formation_pending,'REPLACEMENT_RETAINED_QUEUE_UNAVAILABLE')
+            formation_pending.replacement_result={incoming=w.new,old=w.old,kept=w.kept}
+            return
+        end
         if w.restore_kept then
             -- Reuse the normal guarded draw/publication path after new-pair
             -- formation. Do not draw the incoming weapon just to select slot3.
@@ -3078,22 +3113,29 @@ end
 -- USS-SOURCE-END replacement_transaction.lua
 
 -- USS-SOURCE-BEGIN formation_transaction.lua
--- Pair setup and joined-client draws may wait across updates for primary readiness.
+-- Pair setup and multiplayer draws wait across updates for primary readiness.
 -- Keep the original operation order and publish the actual incoming member before
 -- drawing. A refusal before entry can wait; an uncertain/failed native entry cannot.
 local function queue_formation(p,order,selected,pickup_setting,draw_target,draw_id)
  if not publication then return false end
  local utility_exit=order=='UTILITY_EXIT'
- local managed_draw=order=='CLIENT_DRAW'
+ local retained=order=='RETAINED_MEMBER'
+ local replacement=order=='REPLACEMENT'
+ local managed_draw=order=='PAIR_DRAW' or retained
  local state=publication.status()
+ if state.mission and state.eligible and (state.disabled or state.suspended)then
+  paused=true;emit('PAUSED PAIR_PUBLICATION_UNAVAILABLE');return true
+ end
  if utility_exit or managed_draw then
   -- This is an existing pair whose local support membership would otherwise
   -- change without an incoming publication. Unsupported scopes retain Core's
   -- original local restoration; do not invent a new network contract here.
-  if not state.mission or not (state.host or state.joined_client) or not state.formed
-   or state.disabled or state.suspended then return false end
+  if not state.mission or not (state.host or state.joined_client) or not state.eligible then return false end
+  if not state.formed or state.disabled or state.suspended then
+   paused=true;emit('PAUSED PAIR_PUBLICATION_UNAVAILABLE');return true
+  end
   if managed_draw then
-   if not state.joined_client or selected~=3 then return false end
+   if (not retained and selected~=3) or (selected~=1 and selected~=2 and selected~=3) then return false end
    local expected=draw_target==pair.utility and utility_id
     or draw_target==pair.support and pair.support_id
    if not expected or draw_id~=expected then return false end
@@ -3108,12 +3150,21 @@ local function queue_formation(p,order,selected,pickup_setting,draw_target,draw_
   {target=pair.utility,id=utility_id,label='CAPTURE_UTILITY_FIRST',stage='UTILITY_FIRST_CAPTURE'},
   {target=pair.support,id=pair.support_id,label='RESTORE_UTILITY_FIRST_SUPPORT',stage='POST_ATTACH_INCOMING'},
  } or {{target=pair.support,id=pair.support_id,label='STORE_NEW_UTILITY',stage='POST_ATTACH_INCOMING'}}
- if not managed_draw and not utility_exit and not utility_first and pickup_setting then
+ if replacement then
+  -- Publish the new lifetime before restoring its requested member/selection.
+  -- A current-slot step sends only: it must not repeat native attachment.
+  steps={{target=pair.support,id=pair.support_id,label='STORE_REPLACEMENT_UTILITY',
+   stage='POST_ATTACH_INCOMING',current=p.support==pair.support}}
+  if draw_target==pair.utility then
+   steps[#steps+1]={target=pair.utility,id=utility_id,label='REPLACEMENT_RESTORE',stage='POST_ATTACH_INCOMING'}
+  end
+ end
+ if not managed_draw and not replacement and not utility_exit and not utility_first and pickup_setting then
   steps[#steps+1]={target=pair.utility,id=utility_id,label='DRAW_UTILITY',stage='POST_ATTACH_INCOMING'}
  end
  formation_pending={pair=pair,context=p,epoch=state.epoch,host_role=state.host,utility_id=utility_id,
   ordinary_id=pair.support_id,support=p.support,steps=steps,index=1,selected=selected,origin_selected=p.active,
-  deadline=tonumber(kernel.uss_win1_GetTickCount64())+2000,order=order,pickup=pickup_setting,utility_exit=utility_exit,managed_draw=managed_draw}
+  deadline=tonumber(kernel.uss_win1_GetTickCount64())+2000,order=order,pickup=pickup_setting,utility_exit=utility_exit,managed_draw=managed_draw,replacement=replacement}
  -- The pair remains owned by this work record until completion or cancellation.
  pending_utility=nil
  emit('FORMATION_DEFERRED_BEGIN ORDER='..order..' SELECTED='..selected)
@@ -3124,7 +3175,11 @@ end
 local function queue_lone_publication(p,target,id,outgoing,outgoing_id)
  if not publication then return end
  local recovery=publication.begin_lone(p,target,id,outgoing,outgoing_id)
- if not recovery then return end -- Solo/unsupported scope keeps local behavior.
+ if not recovery then
+  local state=publication.status()
+  if state.mission and state.eligible then paused=true;emit('PAUSED LONE_PUBLICATION_UNAVAILABLE')end
+  return -- Solo keeps its original local behavior.
+ end
  formation_pending={lone=recovery,context=p,selected=p.active,
   deadline=tonumber(kernel.uss_win1_GetTickCount64())+2000}
  emit('LONE_PUBLICATION_BEGIN TARGET='..target..' OUTGOING='..outgoing)
@@ -3181,15 +3236,16 @@ local function service_formation(p,now,input)
  local ok,why=pcall(function()
   local state=publication.status()
   if work.utility_exit and input then error('INPUT_DURING_UTILITY_EXIT',0)end
-  if work.managed_draw and input then error('INPUT_DURING_CLIENT_DRAW',0)end
+  if (work.managed_draw or work.replacement) and input then error('INPUT_DURING_PAIR_DRAW',0)end
   if now>=work.deadline then error('TIMEOUT',0)end
   if not state.mission or not (state.host or state.joined_client) or state.host~=work.host_role or state.epoch~=work.epoch
-   or state.disabled or state.suspended or paused or down or pair~=work.pair
+   or state.disabled or state.suspended or ((work.managed_draw or work.replacement) and not state.eligible)
+   or paused or down or pair~=work.pair
    or not same_context(work.context,p) or not can_switch(p)
    or utility_id~=work.utility_id or pair.support_id~=work.ordinary_id
    or identity(pair.utility)~=work.utility_id or identity(pair.support)~=work.ordinary_id
    or p.support~=work.support then error('CONTEXT_OR_PICKUP_CHANGED',0)end
-  if (work.utility_exit or work.managed_draw) and (p.primary~=work.context.primary or p.secondary~=work.context.secondary
+  if (work.utility_exit or work.managed_draw or work.replacement) and (p.primary~=work.context.primary or p.secondary~=work.context.secondary
    or(not work.primary_requested and p.active~=(work.origin_selected or work.selected)))then
    error('UTILITY_EXIT_SELECTION_CHANGED',0)
   end
@@ -3215,7 +3271,11 @@ local function service_formation(p,now,input)
    -- Consume attachment before entry; failures cancel, never retry it.
    work.attached=true
    work.outgoing=p.support
-   if not switch_entity(p,step.target,step.id,false,step.label,work.managed_draw)then error('ATTACH_FAILED',0)end
+   if step.current then
+    if p.support~=step.target then error('CURRENT_MEMBER_CHANGED',0)end
+   elseif not switch_entity(p,step.target,step.id,false,step.label,work.managed_draw or work.replacement)then
+    error('ATTACH_FAILED',0)
+   end
    work.support=step.target
   end
   local after=sample()
@@ -3237,17 +3297,24 @@ local function service_formation(p,now,input)
   last_support={entity=pair.support,id=pair.support_id};pending_utility=nil
   formation_pending=nil
   if work.managed_draw then
-   -- The attachment ran while primary was selected. Acknowledge only after
-   -- the final draw; the HUD callback freshly checks selection and pair identity.
+   -- Acknowledge only after final selection; never report primary as the draw.
    local acknowledge=_G.UtilitySupportSlotContext.acknowledge_inventory_change
-   if acknowledge then acknowledge(work.outgoing,step.target,step.label)end
-   emit('CLIENT_DRAW_COMPLETE TARGET='..step.target..' ACTIVE='..work.selected)
+   if acknowledge and work.selected==3 then acknowledge(work.outgoing,step.target,step.label)end
+  end
+  if work.replacement_result then
+   local result=work.replacement_result
+   trace_replacement('COMPLETE',nil,result.incoming,result.old,result.kept)
+   emit('REPLACE_TYPED DROPPED='..result.old..' RETAINED='..result.kept..' NEW_REAL='..step.target)
+  end
+  if work.managed_draw then
+   emit('PAIR_DRAW_COMPLETE TARGET='..step.target..' ACTIVE='..work.selected)
    return
   end
   if work.utility_exit then
    emit('UTILITY_EXIT_COMPLETE SUPPORT='..pair.support..' RESTORED_SELECTED='..work.selected)
    return
   end
+  if work.replacement then emit('REPLACEMENT_PUBLICATION_COMPLETE ACTIVE='..work.selected);return end
   emit('PAIR_READY ORDER='..work.order..' UTILITY='..pair.utility..' SUPPORT='..pair.support
    ..' SWITCH_WEAPON_ON_PICKUP='..tostring(work.pickup))
  end)
@@ -3304,6 +3371,10 @@ local function replace_support(p)
  -- as real support and dropped natively. The former local virtual drop here
  -- left that member attached on the observer.
  local state=publication and publication.status()
+ if state and state.mission and state.eligible
+  and (not state.formed or state.disabled or state.suspended)then
+  paused=true;emit('PAUSED REPLACEMENT_PAIR_NOT_PUBLISHED');return
+ end
  if state and state.mission and (state.host or state.joined_client) and state.formed
   and real==kept and k.parent==0 and o.parent==p.avatar then
   -- This shape needs native publication of the old virtual member before drop.
@@ -3373,6 +3444,17 @@ local function replace_support(p)
   pair.utility_drawn=false
   emit('REPLACEMENT_DEFERRED_BEGIN OLD='..old..' UTILITY='..kept..' ORDINARY='..p.support
    ..' RESTORE_SELECTED='..p.active..' WAIT_MS=2000 CHECK_MS=25')
+  return
+ end
+ -- Every other supported multiplayer replacement also needs a completed
+ -- new-pair publication. Keep the pickup's choice across the finite wait.
+ if publication and publication.pending_formation(p) then
+  local selected=is_utility(new_id) and (draw_utility and 3 or previous_active) or p.active
+  local target=is_utility(new_id) and draw_utility and pair.utility or pair.support
+  if not queue_formation(p,'REPLACEMENT',selected,nil,target,identity(target))then
+   paused=true;emit('PAUSED REPLACEMENT_PUBLICATION_UNAVAILABLE');return
+  end
+  formation_pending.replacement_result={incoming=p.support,old=old,kept=kept}
   return
  end
  if k.parent==0 or publish_drawn_utility then
@@ -3479,7 +3561,7 @@ local function service_replacement(p,now,input)
    work.stage_index=index+1 -- Consumed even if native entry/return becomes uncertain.
    work.next_check=now -- Next update, not another25ms delay.
    local start=DEBUG and services.clock()
-   services[stage.method](w)
+   services[stage.method](w,queue_formation)
    if DEBUG then work.parts[#work.parts+1]=stage.method:upper()..'_MS='..(services.clock()-start)end
    if index==#replacement_stages then
     replacement_pending=nil
@@ -3574,6 +3656,7 @@ local function inventory_observation(sample)
     }
 end
 -- USS-SOURCE-END inventory_observation.lua
+
 local observation=inventory_observation(sample)
 _G.UtilitySupportSlotContext={
  native_addresses=native_addresses,
@@ -3770,7 +3853,9 @@ _G.update=function(...)
     local target=pair.utility
     if not dedicated and p.support==pair.utility then target=pair.support end
     local id=target==pair.utility and utility_id or pair.support_id
-    if not queue_formation(p,'CLIENT_DRAW',3,nil,target,id)then
+    -- Either multiplayer role can reach an unfinished primary transition.
+    -- Use the same finite wait before attachment/publication and the final draw.
+    if not queue_formation(p,'PAIR_DRAW',3,nil,target,id)then
      switch_entity(p,target,id,true,target==pair.utility and 'DRAW_UTILITY' or 'DRAW_SUPPORT')
     end
    end
@@ -3903,7 +3988,7 @@ _G.shutdown=function(...)
  if log then log:close();log=nil end
  if shutdown then return shutdown(...) end
 end
-emit('READY DEBUG='..tostring(DEBUG)..' VERSION=0.7.1 INPUT=SUPPORT_ACTION_24 SCOPE=SOLO_OR_GUARDED_TWO_PLAYERS STARTUP_MODE='..startup_mode..' INIT_CPU_MS='..string.format('%.2f',(os.clock()-init_cpu)*1000))
+emit('READY DEBUG='..tostring(DEBUG)..' VERSION=0.7.1 INPUT=SUPPORT_ACTION_24 SCOPE=SOLO_OR_GUARDED_MULTIPLAYER STARTUP_MODE='..startup_mode..' INIT_CPU_MS='..string.format('%.2f',(os.clock()-init_cpu)*1000))
 end)
 if not ok then
 if not logger and loader and loader.open_log then log=log or loader.open_log('UtilitySupportSlot.log');write_log=write_log or utility_log_writer(log);logger=utility_logging(write_log,'error') end

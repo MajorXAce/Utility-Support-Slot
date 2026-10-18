@@ -57,19 +57,15 @@ The game still has one support slot. The mod tracks the other weapon separately
 and keeps it attached to your character. I tried my best to make it feel like a
 vanilla feature, but there will be cases where the gaps show.
 
-Multiplayer was tested while hosting a two-player game and while joining one.
-Joined-player testing covered forming a C4/Machine Gun pair and repeated swaps
-with correct weapons and animations visible to the host. Replacement, dropping
-and recovery while joining still need more testing. Larger groups and completely
-vanilla observers haven't been tested. Hosting tests included a run with this
-mod disabled for the other player.
+Multiplayer was tested while hosting, joining, with both modded and vanilla combinations. Larger groups and extended multiplayer sessions haven't been tested.
 
 - Resupplying from another player's supply backpack will not refill the weapon
   being stored by the mod.
+- Players joining mid-mission may not see your stored weapon until you swap weapons.
 - Leaving a mission while carrying a pair may cause the stored weapon to be
   lost. Keep this in mind before leaving; this behavior hasn't been fully
   tested.
-- Your primary weapon may briefly appear during a swap or replacement.
+- Your primary weapon may briefly appear during a swap or replacement especially in default mode.
 - The mod hides extra pickup messages caused by its weapon handling. An incorrect
   utility pickup message can occasionally appear after replacing an ordinary
   support weapon while primary or secondary remains held with **Switch Weapon On

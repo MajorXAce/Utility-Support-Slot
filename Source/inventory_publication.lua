@@ -1,4 +1,4 @@
--- Host/two-player behavior passed scoped checks; joined-owner integration is a candidate.
+-- Native publication for a normal squad; larger-roster handling is fixture-tested.
 -- Automatic inventory publication, independent of the research workbench.
 -- A member handle, wire ID, resource identity and selected slot are distinct.
 -- Both roles use the same identity, recipient and native-entry contract.
@@ -100,20 +100,11 @@ local function inventory_publication(services)
         local mode = pointer(game+0x33266A0)
         local session = pointer(game+0x347CEF0)
         local mission = uint(read(state+0xAC21C,4),0)==4 and uint(read(mode+8,4),0)==1
-        local self = read(session+0xB398,8)
-        local host = read(session+0xB3A8,8)
-        local zero = string.rep(string.char(0),8)
-        if self == zero then error('SELF_PEER_MISSING',0) end
-        local is_host = self==host or host==zero
-        -- A joined owner may publish only to its one known host. Keep actual
-        -- host identity separate from eligibility used by the transaction guards.
-        local joined_client = false
-        if not is_host and host~=zero and uint(read(session+0x162D8,4),0)==2 then
-            local peers=read(session+0x162E0,16)
-            joined_client=peers:sub(1,8)==self and peers:sub(9,16)==host
-        end
-        local eligible = is_host or joined_client
-        return mission, eligible, session, self, state, is_host, joined_client
+        if not mission then return false,false,session,nil,state,false,false end
+        local peers=inventory_session_peers(read,uint,session)
+        local joined_client=not peers.is_host
+        local eligible=peers.count>1
+        return mission,eligible,session,peers.self,state,peers.is_host,joined_client,peers
     end
     local function update_epoch(mission)
         if mission and not last_mission then epoch=epoch+1;record=nil;replacement_primary.close()end
@@ -144,8 +135,8 @@ local function inventory_publication(services)
             if not supported_pair(pair) or formed_pair(pair)
                 or pair.owner~=owner.owner or pair.avatar~=owner.avatar
                 or _G.UtilitySupportSlotContext~=services.context then return false end
-            local mission,eligible,session=scope()
-            return mission and eligible and uint(read(session+0x162D8,4),0)==2
+            local mission,eligible=scope()
+            return mission and eligible
         end)
         return ok and eligible or false
     end
@@ -227,7 +218,7 @@ local function inventory_publication(services)
     local function capture(stage,include_slot_drop,recovery)
         latest_guard=nil
         reads=0;fingerprint={}
-        local mission, eligible, session, self, game_state = scope()
+        local mission, eligible, session, self, game_state, is_host, joined_client, roster = scope()
         if not mission or not eligible then error('OWNER_MISSION_REQUIRED',0) end
         if _G.UtilitySupportSlotContext~=services.context then error('CONTEXT_CHANGED',0) end
         local owner = require_value(services.sample_inventory(),'INVENTORY_MISSING')
@@ -250,13 +241,7 @@ local function inventory_publication(services)
             error('OWNER_INVENTORY_CHANGED',0)
         end
         character_primary(owner,game_state,stage)
-        local count = uint(read(session+0x162D8,4),0)
-        if count~=2 then error('TWO_PLAYER_SCOPE_REQUIRED',0) end
-        local peers = read(session+0x162E0,16)
-        local zero = string.rep(string.char(0),8)
-        if peers:sub(1,8)~=self or peers:sub(9,16)==zero or peers:sub(9,16)==self then
-            error('RECIPIENT_SELF_ORDER',0)
-        end
+        local peers=roster.context_key
         if recovery and peers~=recovery.peers then error('LONE_PEERS_CHANGED',0) end
         local auxiliary=pointer(session+0x1F860) -- Native-owned dispatch object.
         local helpers = pointer(game+0x33263E8)
@@ -361,11 +346,17 @@ local function inventory_publication(services)
         if after.row~=owner.row or after.address~=owner.address or after.avatar~=owner.avatar
             or after.owner~=owner.owner or after.inventory~=owner.inventory
             or services.current_pair()~=pair then error('CAPTURE_RECHECK',0) end
+        -- A join/leave during the dependency reads must not become an entry
+        -- using a stale recipient set, even if the inventory itself is unchanged.
+        if pointer(game+0x347CEF0)~=session
+            or inventory_session_peers(read,uint,session).context_key~=roster.context_key then
+            error('SESSION_PEERS_CHANGED',0)
+        end
         local thread = services.thread_id()
         if not thread or thread<1 or game_thread and thread~=game_thread then error('GAME_THREAD_CHANGED',0) end
         local key=table.concat({session,mapping,owner.owner,owner.avatar,owner.inventory,
             recovery and recovery.outgoing or pair.utility,recovery and recovery.target or pair.support},':')..peers
-        local result={owner=owner,pair=pair,recovery=recovery,wires=wires,peer_key=peers,key=key,session=session,
+        local result={owner=owner,pair=pair,recovery=recovery,wires=wires,peer_key=peers,peer_ids=roster.key,key=key,session=session,
             fingerprint=table.concat(fingerprint,'|'),thread=thread}
         fingerprint=nil
         return result
@@ -475,11 +466,9 @@ local function inventory_publication(services)
         emit('RETURNED KIND='..kind..' AVATAR='..fresh.owner.avatar..' MEMBER='..fresh.owner.support
             ..' CALLS='..returned..' EPOCH='..epoch..' DELIVERY_PROVEN=false')
         if kind=='FORMATION' then
-            local a,b=fresh.peer_key:sub(1,8),fresh.peer_key:sub(9,16)
-            if b<a then a,b=b,a end
             record.targets={avatar=fresh.wires.avatar,primary=fresh.wires.primary,
                 utility=fresh.wires.utility,ordinary=fresh.wires.ordinary,
-                peers=(a..b):gsub('.',function(c)return string.format('%02x',c:byte())end)}
+                peers=fresh.peer_ids:gsub('.',function(c)return string.format('%02x',c:byte())end)}
         end
         return true
     end
@@ -608,6 +597,6 @@ local function inventory_publication(services)
         end
     end)
     if not ok then disabled=true;note(tostring(reason)) end
-    emit('READY MODE=AUTOMATIC SCOPE=HOST_OR_JOINED_TWO_PLAYERS_TYPED_SUPPORT_PAIR ENABLED='..tostring(not disabled)..' VERSION=29')
+    emit('READY MODE=AUTOMATIC SCOPE=HOST_OR_JOINED_MULTIPLAYER_TYPED_SUPPORT_PAIR ENABLED='..tostring(not disabled)..' VERSION=32')
     return publisher
 end

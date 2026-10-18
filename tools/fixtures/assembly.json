@@ -105,6 +105,11 @@
     "full"
   ],
   [
+    "inventory_session_peers.lua",
+    "utility_support_slot.lua",
+    "full"
+  ],
+  [
     "inventory_publication_dispatch_pins.lua",
     "utility_support_slot.lua",
     "full"

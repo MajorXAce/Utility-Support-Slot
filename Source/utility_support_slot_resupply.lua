@@ -542,7 +542,7 @@ _G.UtilitySupportSlotInstall=function(c)
    local good,err=pcall(observe,now)
    if not good then disabled=true;last=nil;pending=nil;recent_gain=nil;c.resupply_state=nil;c.pickup_completion=nil;c.emit('RESUPPLY_DISABLED ERROR='..tostring(err))end
   end
-  c.emit('RESUPPLY_READY VERSION=0.7.0 MODE=CLASSIFIED_PICKUP_AND_SELF_SUPPLY SOURCE_POLICY=true ZERO_DIRECT_REFILL_GUARD=true POLL_MS=100 UNCLASSIFIED_GAIN_FALLBACK=false SELF_SUPPLY='..tostring(supply_enabled))
+  c.emit('RESUPPLY_READY VERSION=0.7.1 MODE=CLASSIFIED_PICKUP_AND_SELF_SUPPLY SOURCE_POLICY=true ZERO_DIRECT_REFILL_GUARD=true POLL_MS=100 UNCLASSIFIED_GAIN_FALLBACK=false SELF_SUPPLY='..tostring(supply_enabled))
  end)
  if not ok then c.emit('RESUPPLY_INIT_ERROR='..tostring(problem))end
 end
@@ -861,7 +861,7 @@ do
     end
     if resupply then return resupply(now)end
    end
-   c.emit('PICKUP_FILTER_READY VERSION=0.7.0 AUTOMATIC=true ACTION_POLL_MS=25 SOURCE_REFRESH_MS=250 CACHE_LIMIT=16 SELECTED_SOURCE_ONLY=true NO_PAIR_SCANS=false')
+   c.emit('PICKUP_FILTER_READY VERSION=0.7.1 AUTOMATIC=true ACTION_POLL_MS=25 SOURCE_REFRESH_MS=250 CACHE_LIMIT=16 SELECTED_SOURCE_ONLY=true NO_PAIR_SCANS=false')
   end)
   if not ok then c.emit('PICKUP_FILTER_INIT_ERROR='..tostring(err))end
  end
@@ -2264,9 +2264,9 @@ do
     local good,why=pcall(acknowledge,from,target,label)
     if not good then disabled=true;pcall(emit,'ACK_DISABLED ERROR='..tostring(why))end
    end
-   emit('READY VERSION=0.7.0 BASE_GAMEPLAY=0.6.0 MODE=EVENT_DRIVEN_HISTORY_ACK RESTORATION=true EXACT_REMOVAL_STATE=true DISPLAY_CACHE_SYNC=true DISPLAYED_PICKUP_ACK=true SKIP_STATE=true RESTORATION_HANDOFF=true OBSERVATIONS=BOUNDED_DROP_RECORD SECOND_DROP_LUA_QUEUE=true NATIVE_HOLD_SHORTENING=true QUEUE_IDLE_CHECK_MS=100 HANDOFF_DIRTY_GUARD=true FAST_INVENTORY_CHECK_MS=25 F8=UNUSED')
-   if debug then c.emit('PICKUP_HUD_TRACE_READY VERSION=0.7.0 READ_ONLY=true AUTO_WINDOW_MS=5000 MAX_SAMPLES=10 PRESENTATION_READ_ONLY=true LOG=UtilitySupportSlot.log')end
-   c.emit('HUD_ACK_READY VERSION=0.7.0 LOG=UtilitySupportSlot.log')
+   emit('READY VERSION=0.7.1 BASE_GAMEPLAY=0.6.0 MODE=EVENT_DRIVEN_HISTORY_ACK RESTORATION=true EXACT_REMOVAL_STATE=true DISPLAY_CACHE_SYNC=true DISPLAYED_PICKUP_ACK=true SKIP_STATE=true RESTORATION_HANDOFF=true OBSERVATIONS=BOUNDED_DROP_RECORD SECOND_DROP_LUA_QUEUE=true NATIVE_HOLD_SHORTENING=true QUEUE_IDLE_CHECK_MS=100 HANDOFF_DIRTY_GUARD=true FAST_INVENTORY_CHECK_MS=25 F8=UNUSED')
+   if debug then c.emit('PICKUP_HUD_TRACE_READY VERSION=0.7.1 READ_ONLY=true AUTO_WINDOW_MS=5000 MAX_SAMPLES=10 PRESENTATION_READ_ONLY=true LOG=UtilitySupportSlot.log')end
+   c.emit('HUD_ACK_READY VERSION=0.7.1 LOG=UtilitySupportSlot.log')
   end)
   if not ok then pcall(emit,'INIT_ERROR='..tostring(problem));c.emit('HUD_ACK_INIT_ERROR='..tostring(problem))end
  end
@@ -2606,7 +2606,7 @@ do
     end
     return unpack(result,1,result.n)
    end
-   c.emit('RESUPPLY_OBSERVER_READY VERSION=0.7.0 F8=START_5_SECOND_WINDOW READ_ONLY=true')
+   c.emit('RESUPPLY_OBSERVER_READY VERSION=0.7.1 F8=START_5_SECOND_WINDOW READ_ONLY=true')
   end)
   if not ok then c.emit('RESUPPLY_OBSERVER_INIT_ERROR='..tostring(why))end
  end

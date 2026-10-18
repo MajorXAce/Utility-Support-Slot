@@ -49,3 +49,10 @@ PUBLIC_EXPORT.json records the development revision and hashes of the approved
 exported files. The public repository has independent history; private research,
 logs, personal paths and local test tools are not included. Building or packaging
 never uploads, commits, tags or publishes a release.
+
+## GitHub releases
+
+On the public repository, open Actions > Prepare player release > Run workflow
+on main. Leave Publish immediately off for a draft you can inspect first. The
+workflow takes its tag from VERSION and uploads only the player ZIP; it refuses
+an existing tag or release. Source pushes alone do not publish releases.

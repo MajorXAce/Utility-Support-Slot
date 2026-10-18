@@ -324,7 +324,7 @@ do
     end
     return unpack(result,1,result.n)
    end
-   c.emit('RESUPPLY_OBSERVER_READY VERSION=0.7.0 F8=START_5_SECOND_WINDOW READ_ONLY=true')
+   c.emit('RESUPPLY_OBSERVER_READY VERSION=0.7.1 F8=START_5_SECOND_WINDOW READ_ONLY=true')
   end)
   if not ok then c.emit('RESUPPLY_OBSERVER_INIT_ERROR='..tostring(why))end
  end

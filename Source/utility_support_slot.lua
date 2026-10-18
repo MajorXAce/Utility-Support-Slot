@@ -1423,10 +1423,10 @@ end
 -- USS-SOURCE-END replacement_primary_boundary.lua
 
 -- USS-SOURCE-BEGIN inventory_publication.lua
--- Host/two-player formation, replacement and recovery passed scoped live checks.
+-- Host/two-player behavior passed scoped checks; joined-owner integration is a candidate.
 -- Automatic inventory publication, independent of the research workbench.
 -- A member handle, wire ID, resource identity and selected slot are distinct.
--- Typed pair eligibility retains the tested host/two-player native contract.
+-- Both roles use the same identity, recipient and native-entry contract.
 local function inventory_publication(services)
     local memory, game, ffi = services.memory, services.game_base, services.ffi
     local uint = services.read_u32
@@ -1529,7 +1529,16 @@ local function inventory_publication(services)
         local host = read(session+0xB3A8,8)
         local zero = string.rep(string.char(0),8)
         if self == zero then error('SELF_PEER_MISSING',0) end
-        return mission, self==host or host==zero, session, self, state
+        local is_host = self==host or host==zero
+        -- A joined owner may publish only to its one known host. Keep actual
+        -- host identity separate from eligibility used by the transaction guards.
+        local joined_client = false
+        if not is_host and host~=zero and uint(read(session+0x162D8,4),0)==2 then
+            local peers=read(session+0x162E0,16)
+            joined_client=peers:sub(1,8)==self and peers:sub(9,16)==host
+        end
+        local eligible = is_host or joined_client
+        return mission, eligible, session, self, state, is_host, joined_client
     end
     local function update_epoch(mission)
         if mission and not last_mission then epoch=epoch+1;record=nil;replacement_primary.close()end
@@ -1560,8 +1569,8 @@ local function inventory_publication(services)
             if not supported_pair(pair) or formed_pair(pair)
                 or pair.owner~=owner.owner or pair.avatar~=owner.avatar
                 or _G.UtilitySupportSlotContext~=services.context then return false end
-            local mission,host,session=scope()
-            return mission and host and uint(read(session+0x162D8,4),0)==2
+            local mission,eligible,session=scope()
+            return mission and eligible and uint(read(session+0x162D8,4),0)==2
         end)
         return ok and eligible or false
     end
@@ -1607,8 +1616,8 @@ local function inventory_publication(services)
     function publisher.formation_primary_ready(owner)
         if disabled or suspended then return false,'PUBLICATION_UNAVAILABLE' end
         local ok,reason=pcall(function()
-            local mission,host,_,_,game_state=scope()
-            if not mission or not host or not supported_pair(services.current_pair()) then
+            local mission,eligible,_,_,game_state=scope()
+            if not mission or not eligible or not supported_pair(services.current_pair()) then
                 error('FORMATION_SCOPE_CHANGED',0)
             end
             character_primary(owner,game_state,'FORMATION_WAIT')
@@ -1625,15 +1634,15 @@ local function inventory_publication(services)
     function publisher.replacement_scope_ready(expected_epoch)
         if disabled or suspended or epoch~=expected_epoch
             or _G.UtilitySupportSlotContext~=services.context then return false end
-        local ok,mission,host=pcall(scope)
-        return ok and mission and host or false
+        local ok,mission,eligible=pcall(scope)
+        return ok and mission and eligible or false
     end
     function publisher.replacement_primary_ready(owner)
         local previous_sequence=guard_sequence
         if not publisher.pending_formation(owner) then return false,'REPLACEMENT_SCOPE_CHANGED' end
         local ok,reason=pcall(function()
-            local mission,host,_,_,game_state=scope()
-            if not mission or not host then error('REPLACEMENT_SCOPE_CHANGED',0) end
+            local mission,eligible,_,_,game_state=scope()
+            if not mission or not eligible then error('REPLACEMENT_SCOPE_CHANGED',0) end
             character_primary(owner,game_state,'REPLACEMENT_WAIT')
         end)
         -- Reuse this exact guard sample; diagnostics never issue another read.
@@ -1643,8 +1652,8 @@ local function inventory_publication(services)
     local function capture(stage,include_slot_drop,recovery)
         latest_guard=nil
         reads=0;fingerprint={}
-        local mission, host, session, self, game_state = scope()
-        if not mission or not host then error('HOST_MISSION_REQUIRED',0) end
+        local mission, eligible, session, self, game_state = scope()
+        if not mission or not eligible then error('OWNER_MISSION_REQUIRED',0) end
         if _G.UtilitySupportSlotContext~=services.context then error('CONTEXT_CHANGED',0) end
         local owner = require_value(services.sample_inventory(),'INVENTORY_MISSING')
         local pair = services.current_pair()
@@ -2005,10 +2014,11 @@ local function inventory_publication(services)
         record=nil;next_poll=0;latest_guard=nil;refused_guard=nil;guard_logs=0
     end
     function publisher.status()
-        local ok,mission,host=pcall(scope)
-        if ok then update_epoch(mission) else mission=nil;host=nil end
+        local ok,mission,eligible,_,_,_,host,joined_client=pcall(scope)
+        if ok then update_epoch(mission) else mission=nil;host=nil;joined_client=nil end
         local formed=formed_pair(services.current_pair())
         return {replacement_primary=replacement_primary.status(),epoch=epoch,mission=mission,host=host,formed=formed,
+            joined_client=joined_client,eligible=eligible,
             entered=entered,returned=returned,disabled=disabled,suspended=suspended,last_reason=last_reason,
             targets=formed and record.targets or nil,
             latest_guard=copy_guard(latest_guard),refused_guard=copy_guard(refused_guard)}
@@ -2023,7 +2033,7 @@ local function inventory_publication(services)
         end
     end)
     if not ok then disabled=true;note(tostring(reason)) end
-    emit('READY MODE=AUTOMATIC SCOPE=HOST_TWO_PLAYERS_TYPED_SUPPORT_PAIR ENABLED='..tostring(not disabled)..' VERSION=26')
+    emit('READY MODE=AUTOMATIC SCOPE=HOST_OR_JOINED_TWO_PLAYERS_TYPED_SUPPORT_PAIR ENABLED='..tostring(not disabled)..' VERSION=29')
     return publisher
 end
 -- USS-SOURCE-END inventory_publication.lua
@@ -2445,7 +2455,7 @@ local filter_restore,filter_stop
 -- live entity handle; target_id is its expected eight-byte resource identity.
 -- draw requests selection as well as slot restoration; label names our operation
 -- for logs/HUD coordination. The fresh `current` snapshot below must still agree.
-local function switch_entity(p,target,target_id,draw,label)
+local function switch_entity(p,target,target_id,draw,label,defer_ack)
  local current=sample()
  if not same_context(p,current) or current.row~=p.row or not can_switch(current)
   or identity(target)~=target_id then return false end
@@ -2530,7 +2540,7 @@ local function switch_entity(p,target,target_id,draw,label)
  -- The callback isolates errors and validates explicit pair swaps or automatic
  -- restoration. Initial utility pickup restoration acknowledges only the
  -- automatic partner restoration; rendered genuine pickup messages stay intact.
- if _G.UtilitySupportSlotContext.acknowledge_inventory_change then _G.UtilitySupportSlotContext.acknowledge_inventory_change(support_before,target,label) end
+ if not defer_ack and _G.UtilitySupportSlotContext.acknowledge_inventory_change then _G.UtilitySupportSlotContext.acknowledge_inventory_change(support_before,target,label) end
  if replacement_action then trace_replacement('ATTACH_AFTER_'..label,nil,support_before,0,target)end
  return true
 end
@@ -2725,7 +2735,7 @@ filter_stop=function()
  filter_armed=false;filter_failed=true;filter_restore()
  emit('FILTER_TEST_END CALLS='..filter_calls..' RESTORE_PENDING='..tostring(filter_old~=nil))
 end
-emit('FILTER_TEST_READY VERSION=0.7.0 AUTOMATIC CANDIDATE=37')
+emit('FILTER_TEST_READY VERSION=0.7.1 AUTOMATIC CANDIDATE=37')
 
 -- Let vanilla detach the normal inventory first, then drop the stored member
 -- once. Require empty inventory and fresh owner/parent checks before the call.
@@ -2885,7 +2895,7 @@ local function replacement_transaction_services(guard_queue)
         route()
         local p=must(sample(),'CONTROL_INVENTORY')
         local state=must(publication,'CONTROL_PUBLICATION').status()
-        must(state.mission and state.host and state.formed and not state.disabled
+        must(state.mission and (state.host or state.joined_client) and state.formed and not state.disabled
             and not state.suspended and state.targets,'CONTROL_FORMED_HOST_REQUIRED')
         must(not paused and not down and pair and check_pair(p) and can_switch(p)
             and pair.support_id==unhex('609eb048dc0b9d2e') and utility_id==SOLO_SILO_ID
@@ -2896,13 +2906,13 @@ local function replacement_transaction_services(guard_queue)
         return {pair=pair,context=p,old=pair.support,old_id=pair.support_id,
             utility=pair.utility,utility_id=utility_id,selected=p.active,
             ordinary=pair.support,ordinary_id=pair.support_id,
-            epoch=state.epoch,peers=peers()}
+            epoch=state.epoch,peers=peers(),host_role=state.host}
     end
     function s.seed(p)
         -- Seed only reads the intended replacement. begin() freshly checks the
         -- route before its filter restoration/primary selection/native preparation.
         local state=publication.status()
-        must(state.mission and state.host and state.formed and state.targets
+        must(state.mission and (state.host or state.joined_client) and state.formed and state.targets
             and not state.disabled and not state.suspended,'REPLACEMENT_FORMED_HOST_REQUIRED')
         local incoming_id=identity(p.support)
         local replacing_utility=incoming_id and is_utility(incoming_id)
@@ -2926,7 +2936,7 @@ local function replacement_transaction_services(guard_queue)
             ordinary=pair.support,ordinary_id=pair.support_id,
             replacing_utility=replacing_utility,new_id=incoming_id,
             selected=p.active,origin=origin,restore_kept=pickup_setting==false,
-            epoch=state.epoch,peers=peers()}
+            epoch=state.epoch,peers=peers(),host_role=state.host}
     end
     function s.begin(w,p)
         route()
@@ -2963,7 +2973,8 @@ local function replacement_transaction_services(guard_queue)
         must(publication.replacement_scope_ready(w.epoch),'CONTROL_MISSION_CHANGED')
         local state=publication.status()
         must(peers()==w.peers,'CONTROL_PEERS_CHANGED')
-        must(state.mission and state.host and state.epoch==w.epoch
+        must(state.host==w.host_role,'CONTROL_OWNER_ROLE_CHANGED')
+        must(state.mission and (state.host or state.joined_client) and state.epoch==w.epoch
             and not state.disabled and not state.suspended,'CONTROL_MISSION_CHANGED')
         must(not paused and not down and pair==w.pair and same_context(w.context,p)
             and can_switch(p) and pair.utility==w.utility
@@ -3067,33 +3078,42 @@ end
 -- USS-SOURCE-END replacement_transaction.lua
 
 -- USS-SOURCE-BEGIN formation_transaction.lua
--- Initial pair setup may span updates while the native primary transition settles.
+-- Pair setup and joined-client draws may wait across updates for primary readiness.
 -- Keep the original operation order and publish the actual incoming member before
 -- drawing. A refusal before entry can wait; an uncertain/failed native entry cannot.
-local function queue_formation(p,order,selected,pickup_setting)
+local function queue_formation(p,order,selected,pickup_setting,draw_target,draw_id)
  if not publication then return false end
  local utility_exit=order=='UTILITY_EXIT'
+ local managed_draw=order=='CLIENT_DRAW'
  local state=publication.status()
- if utility_exit then
+ if utility_exit or managed_draw then
   -- This is an existing pair whose local support membership would otherwise
   -- change without an incoming publication. Unsupported scopes retain Core's
   -- original local restoration; do not invent a new network contract here.
-  if not state.mission or not state.host or not state.formed
+  if not state.mission or not (state.host or state.joined_client) or not state.formed
    or state.disabled or state.suspended then return false end
+  if managed_draw then
+   if not state.joined_client or selected~=3 then return false end
+   local expected=draw_target==pair.utility and utility_id
+    or draw_target==pair.support and pair.support_id
+   if not expected or draw_id~=expected then return false end
+  end
  elseif not publication.pending_formation(p)then return false end
  local utility_first=order=='UTILITY_FIRST'
- local steps=utility_exit and {
+ local steps=managed_draw and {
+  {target=draw_target,id=draw_id,label=draw_target==pair.utility and 'DRAW_UTILITY' or 'DRAW_SUPPORT',stage='POST_ATTACH_INCOMING'},
+ } or utility_exit and {
   {target=pair.support,id=pair.support_id,label='STORE_UTILITY_ON_WEAPON_CHANGE',stage='POST_ATTACH_INCOMING'},
  } or utility_first and {
   {target=pair.utility,id=utility_id,label='CAPTURE_UTILITY_FIRST',stage='UTILITY_FIRST_CAPTURE'},
   {target=pair.support,id=pair.support_id,label='RESTORE_UTILITY_FIRST_SUPPORT',stage='POST_ATTACH_INCOMING'},
  } or {{target=pair.support,id=pair.support_id,label='STORE_NEW_UTILITY',stage='POST_ATTACH_INCOMING'}}
- if not utility_exit and not utility_first and pickup_setting then
+ if not managed_draw and not utility_exit and not utility_first and pickup_setting then
   steps[#steps+1]={target=pair.utility,id=utility_id,label='DRAW_UTILITY',stage='POST_ATTACH_INCOMING'}
  end
- formation_pending={pair=pair,context=p,epoch=state.epoch,utility_id=utility_id,
-  ordinary_id=pair.support_id,support=p.support,steps=steps,index=1,selected=selected,
-  deadline=tonumber(kernel.uss_win1_GetTickCount64())+2000,order=order,pickup=pickup_setting,utility_exit=utility_exit}
+ formation_pending={pair=pair,context=p,epoch=state.epoch,host_role=state.host,utility_id=utility_id,
+  ordinary_id=pair.support_id,support=p.support,steps=steps,index=1,selected=selected,origin_selected=p.active,
+  deadline=tonumber(kernel.uss_win1_GetTickCount64())+2000,order=order,pickup=pickup_setting,utility_exit=utility_exit,managed_draw=managed_draw}
  -- The pair remains owned by this work record until completion or cancellation.
  pending_utility=nil
  emit('FORMATION_DEFERRED_BEGIN ORDER='..order..' SELECTED='..selected)
@@ -3161,21 +3181,22 @@ local function service_formation(p,now,input)
  local ok,why=pcall(function()
   local state=publication.status()
   if work.utility_exit and input then error('INPUT_DURING_UTILITY_EXIT',0)end
+  if work.managed_draw and input then error('INPUT_DURING_CLIENT_DRAW',0)end
   if now>=work.deadline then error('TIMEOUT',0)end
-  if not state.mission or not state.host or state.epoch~=work.epoch
+  if not state.mission or not (state.host or state.joined_client) or state.host~=work.host_role or state.epoch~=work.epoch
    or state.disabled or state.suspended or paused or down or pair~=work.pair
    or not same_context(work.context,p) or not can_switch(p)
    or utility_id~=work.utility_id or pair.support_id~=work.ordinary_id
    or identity(pair.utility)~=work.utility_id or identity(pair.support)~=work.ordinary_id
    or p.support~=work.support then error('CONTEXT_OR_PICKUP_CHANGED',0)end
-  if work.utility_exit and (p.primary~=work.context.primary or p.secondary~=work.context.secondary
-   or(not work.primary_requested and p.active~=work.selected))then
+  if (work.utility_exit or work.managed_draw) and (p.primary~=work.context.primary or p.secondary~=work.context.secondary
+   or(not work.primary_requested and p.active~=(work.origin_selected or work.selected)))then
    error('UTILITY_EXIT_SELECTION_CHANGED',0)
   end
   for _,member in ipairs({{pair.utility,work.utility_id},{pair.support,work.ordinary_id}})do
    local item=attached_entity(member[1],member[2])
    if not item or (item.parent~=0 and item.parent~=p.avatar)
-    or(work.utility_exit and item.parent~=p.avatar)then error('PARENT_CHANGED',0)end
+    or((work.utility_exit or work.managed_draw) and item.parent~=p.avatar)then error('PARENT_CHANGED',0)end
   end
   if not work.primary_requested then
    -- Request once. Never force primary again after intervening player input.
@@ -3193,7 +3214,8 @@ local function service_formation(p,now,input)
   if not work.attached then
    -- Consume attachment before entry; failures cancel, never retry it.
    work.attached=true
-   if not switch_entity(p,step.target,step.id,false,step.label)then error('ATTACH_FAILED',0)end
+   work.outgoing=p.support
+   if not switch_entity(p,step.target,step.id,false,step.label,work.managed_draw)then error('ATTACH_FAILED',0)end
    work.support=step.target
   end
   local after=sample()
@@ -3214,6 +3236,14 @@ local function service_formation(p,now,input)
   pair.utility_drawn=step.target==pair.utility and work.selected==3
   last_support={entity=pair.support,id=pair.support_id};pending_utility=nil
   formation_pending=nil
+  if work.managed_draw then
+   -- The attachment ran while primary was selected. Acknowledge only after
+   -- the final draw; the HUD callback freshly checks selection and pair identity.
+   local acknowledge=_G.UtilitySupportSlotContext.acknowledge_inventory_change
+   if acknowledge then acknowledge(work.outgoing,step.target,step.label)end
+   emit('CLIENT_DRAW_COMPLETE TARGET='..step.target..' ACTIVE='..work.selected)
+   return
+  end
   if work.utility_exit then
    emit('UTILITY_EXIT_COMPLETE SUPPORT='..pair.support..' RESTORED_SELECTED='..work.selected)
    return
@@ -3274,7 +3304,7 @@ local function replace_support(p)
  -- as real support and dropped natively. The former local virtual drop here
  -- left that member attached on the observer.
  local state=publication and publication.status()
- if state and state.mission and state.host and state.formed
+ if state and state.mission and (state.host or state.joined_client) and state.formed
   and real==kept and k.parent==0 and o.parent==p.avatar then
   -- This shape needs native publication of the old virtual member before drop.
   -- An unrecognized selection must not fall back to its known local-only cleanup.
@@ -3465,7 +3495,7 @@ local function service_replacement(p,now,input)
  end
  work.next_check=now+25
  local state=publication.status()
- if not state.mission or not state.host or state.epoch~=work.epoch then
+ if not state.mission or not (state.host or state.joined_client) or state.epoch~=work.epoch then
   cancel('MISSION_OR_AUTHORITY_CHANGED');return true
  end
  if paused or down or pair~=work.pair or not same_context(work.context,p)
@@ -3740,7 +3770,9 @@ _G.update=function(...)
     local target=pair.utility
     if not dedicated and p.support==pair.utility then target=pair.support end
     local id=target==pair.utility and utility_id or pair.support_id
-    switch_entity(p,target,id,true,target==pair.utility and 'DRAW_UTILITY' or 'DRAW_SUPPORT')
+    if not queue_formation(p,'CLIENT_DRAW',3,nil,target,id)then
+     switch_entity(p,target,id,true,target==pair.utility and 'DRAW_UTILITY' or 'DRAW_SUPPORT')
+    end
    end
    return
   end
@@ -3871,7 +3903,7 @@ _G.shutdown=function(...)
  if log then log:close();log=nil end
  if shutdown then return shutdown(...) end
 end
-emit('READY DEBUG='..tostring(DEBUG)..' VERSION=0.7.0 INPUT=SUPPORT_ACTION_24 SCOPE=SOLO_OR_GUARDED_HOST_TWO_PLAYERS STARTUP_MODE='..startup_mode..' INIT_CPU_MS='..string.format('%.2f',(os.clock()-init_cpu)*1000))
+emit('READY DEBUG='..tostring(DEBUG)..' VERSION=0.7.1 INPUT=SUPPORT_ACTION_24 SCOPE=SOLO_OR_GUARDED_TWO_PLAYERS STARTUP_MODE='..startup_mode..' INIT_CPU_MS='..string.format('%.2f',(os.clock()-init_cpu)*1000))
 end)
 if not ok then
 if not logger and loader and loader.open_log then log=log or loader.open_log('UtilitySupportSlot.log');write_log=write_log or utility_log_writer(log);logger=utility_logging(write_log,'error') end

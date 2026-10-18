@@ -47,7 +47,7 @@ local function replacement_transaction_services(guard_queue)
         route()
         local p=must(sample(),'CONTROL_INVENTORY')
         local state=must(publication,'CONTROL_PUBLICATION').status()
-        must(state.mission and state.host and state.formed and not state.disabled
+        must(state.mission and (state.host or state.joined_client) and state.formed and not state.disabled
             and not state.suspended and state.targets,'CONTROL_FORMED_HOST_REQUIRED')
         must(not paused and not down and pair and check_pair(p) and can_switch(p)
             and pair.support_id==unhex('609eb048dc0b9d2e') and utility_id==SOLO_SILO_ID
@@ -58,13 +58,13 @@ local function replacement_transaction_services(guard_queue)
         return {pair=pair,context=p,old=pair.support,old_id=pair.support_id,
             utility=pair.utility,utility_id=utility_id,selected=p.active,
             ordinary=pair.support,ordinary_id=pair.support_id,
-            epoch=state.epoch,peers=peers()}
+            epoch=state.epoch,peers=peers(),host_role=state.host}
     end
     function s.seed(p)
         -- Seed only reads the intended replacement. begin() freshly checks the
         -- route before its filter restoration/primary selection/native preparation.
         local state=publication.status()
-        must(state.mission and state.host and state.formed and state.targets
+        must(state.mission and (state.host or state.joined_client) and state.formed and state.targets
             and not state.disabled and not state.suspended,'REPLACEMENT_FORMED_HOST_REQUIRED')
         local incoming_id=identity(p.support)
         local replacing_utility=incoming_id and is_utility(incoming_id)
@@ -88,7 +88,7 @@ local function replacement_transaction_services(guard_queue)
             ordinary=pair.support,ordinary_id=pair.support_id,
             replacing_utility=replacing_utility,new_id=incoming_id,
             selected=p.active,origin=origin,restore_kept=pickup_setting==false,
-            epoch=state.epoch,peers=peers()}
+            epoch=state.epoch,peers=peers(),host_role=state.host}
     end
     function s.begin(w,p)
         route()
@@ -125,7 +125,8 @@ local function replacement_transaction_services(guard_queue)
         must(publication.replacement_scope_ready(w.epoch),'CONTROL_MISSION_CHANGED')
         local state=publication.status()
         must(peers()==w.peers,'CONTROL_PEERS_CHANGED')
-        must(state.mission and state.host and state.epoch==w.epoch
+        must(state.host==w.host_role,'CONTROL_OWNER_ROLE_CHANGED')
+        must(state.mission and (state.host or state.joined_client) and state.epoch==w.epoch
             and not state.disabled and not state.suspended,'CONTROL_MISSION_CHANGED')
         must(not paused and not down and pair==w.pair and same_context(w.context,p)
             and can_switch(p) and pair.utility==w.utility

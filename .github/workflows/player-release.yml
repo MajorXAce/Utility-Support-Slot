@@ -1,0 +1,41 @@
+name: Prepare player release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish immediately (leave off to review a draft first)
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: player-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build and verify public source
+        run: |
+          python tools/build_release.py
+          python tools/verify_public.py
+      - name: Prepare the exact player ZIP and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISH_RELEASE: ${{ inputs.publish }}
+        run: |
+          if [ "$PUBLISH_RELEASE" = "true" ]; then
+            python tools/github_release.py --execute --publish
+          else
+            python tools/github_release.py --execute
+          fi

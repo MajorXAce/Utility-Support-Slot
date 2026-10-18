@@ -1,4 +1,4 @@
-# Utility Support Slot v0.7.0
+# Utility Support Slot v0.7.1
 
 This mod allows you to carry one utility (Solo Silo designator or C4 detonator)
 alongside another support weapon. Two utilities or two ordinary support weapons
@@ -57,10 +57,12 @@ The game still has one support slot. The mod tracks the other weapon separately
 and keeps it attached to your character. I tried my best to make it feel like a
 vanilla feature, but there will be cases where the gaps show.
 
-Multiplayer support was tested with the mod user **hosting a two-player game**.
-The other player saw both stored weapons and correct draws, including a run with
-this mod disabled for the other player. Using the mod as a joining
-player, larger groups, and completely vanilla observers haven't been tested.
+Multiplayer was tested while hosting a two-player game and while joining one.
+Joined-player testing covered forming a C4/Machine Gun pair and repeated swaps
+with correct weapons and animations visible to the host. Replacement, dropping
+and recovery while joining still need more testing. Larger groups and completely
+vanilla observers haven't been tested. Hosting tests included a run with this
+mod disabled for the other player.
 
 - Resupplying from another player's supply backpack will not refill the weapon
   being stored by the mod.

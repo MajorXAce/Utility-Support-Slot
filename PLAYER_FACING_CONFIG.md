@@ -1,6 +1,6 @@
 # Player-facing configuration and text inventory
 
-Current v0.7.0 text is recorded verbatim below. Descriptions use the same plain
+Current v0.7.1 text is recorded verbatim below. Descriptions use the same plain
 language as the README; labels, defaults and saved identifiers are preserved.
 Edit display text or the version in `PLAYER_FACING_CONFIG.json`, then run:
 

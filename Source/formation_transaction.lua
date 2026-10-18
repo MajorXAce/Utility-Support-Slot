@@ -1,30 +1,39 @@
--- Initial pair setup may span updates while the native primary transition settles.
+-- Pair setup and joined-client draws may wait across updates for primary readiness.
 -- Keep the original operation order and publish the actual incoming member before
 -- drawing. A refusal before entry can wait; an uncertain/failed native entry cannot.
-local function queue_formation(p,order,selected,pickup_setting)
+local function queue_formation(p,order,selected,pickup_setting,draw_target,draw_id)
  if not publication then return false end
  local utility_exit=order=='UTILITY_EXIT'
+ local managed_draw=order=='CLIENT_DRAW'
  local state=publication.status()
- if utility_exit then
+ if utility_exit or managed_draw then
   -- This is an existing pair whose local support membership would otherwise
   -- change without an incoming publication. Unsupported scopes retain Core's
   -- original local restoration; do not invent a new network contract here.
-  if not state.mission or not state.host or not state.formed
+  if not state.mission or not (state.host or state.joined_client) or not state.formed
    or state.disabled or state.suspended then return false end
+  if managed_draw then
+   if not state.joined_client or selected~=3 then return false end
+   local expected=draw_target==pair.utility and utility_id
+    or draw_target==pair.support and pair.support_id
+   if not expected or draw_id~=expected then return false end
+  end
  elseif not publication.pending_formation(p)then return false end
  local utility_first=order=='UTILITY_FIRST'
- local steps=utility_exit and {
+ local steps=managed_draw and {
+  {target=draw_target,id=draw_id,label=draw_target==pair.utility and 'DRAW_UTILITY' or 'DRAW_SUPPORT',stage='POST_ATTACH_INCOMING'},
+ } or utility_exit and {
   {target=pair.support,id=pair.support_id,label='STORE_UTILITY_ON_WEAPON_CHANGE',stage='POST_ATTACH_INCOMING'},
  } or utility_first and {
   {target=pair.utility,id=utility_id,label='CAPTURE_UTILITY_FIRST',stage='UTILITY_FIRST_CAPTURE'},
   {target=pair.support,id=pair.support_id,label='RESTORE_UTILITY_FIRST_SUPPORT',stage='POST_ATTACH_INCOMING'},
  } or {{target=pair.support,id=pair.support_id,label='STORE_NEW_UTILITY',stage='POST_ATTACH_INCOMING'}}
- if not utility_exit and not utility_first and pickup_setting then
+ if not managed_draw and not utility_exit and not utility_first and pickup_setting then
   steps[#steps+1]={target=pair.utility,id=utility_id,label='DRAW_UTILITY',stage='POST_ATTACH_INCOMING'}
  end
- formation_pending={pair=pair,context=p,epoch=state.epoch,utility_id=utility_id,
-  ordinary_id=pair.support_id,support=p.support,steps=steps,index=1,selected=selected,
-  deadline=tonumber(kernel.uss_win1_GetTickCount64())+2000,order=order,pickup=pickup_setting,utility_exit=utility_exit}
+ formation_pending={pair=pair,context=p,epoch=state.epoch,host_role=state.host,utility_id=utility_id,
+  ordinary_id=pair.support_id,support=p.support,steps=steps,index=1,selected=selected,origin_selected=p.active,
+  deadline=tonumber(kernel.uss_win1_GetTickCount64())+2000,order=order,pickup=pickup_setting,utility_exit=utility_exit,managed_draw=managed_draw}
  -- The pair remains owned by this work record until completion or cancellation.
  pending_utility=nil
  emit('FORMATION_DEFERRED_BEGIN ORDER='..order..' SELECTED='..selected)
@@ -92,21 +101,22 @@ local function service_formation(p,now,input)
  local ok,why=pcall(function()
   local state=publication.status()
   if work.utility_exit and input then error('INPUT_DURING_UTILITY_EXIT',0)end
+  if work.managed_draw and input then error('INPUT_DURING_CLIENT_DRAW',0)end
   if now>=work.deadline then error('TIMEOUT',0)end
-  if not state.mission or not state.host or state.epoch~=work.epoch
+  if not state.mission or not (state.host or state.joined_client) or state.host~=work.host_role or state.epoch~=work.epoch
    or state.disabled or state.suspended or paused or down or pair~=work.pair
    or not same_context(work.context,p) or not can_switch(p)
    or utility_id~=work.utility_id or pair.support_id~=work.ordinary_id
    or identity(pair.utility)~=work.utility_id or identity(pair.support)~=work.ordinary_id
    or p.support~=work.support then error('CONTEXT_OR_PICKUP_CHANGED',0)end
-  if work.utility_exit and (p.primary~=work.context.primary or p.secondary~=work.context.secondary
-   or(not work.primary_requested and p.active~=work.selected))then
+  if (work.utility_exit or work.managed_draw) and (p.primary~=work.context.primary or p.secondary~=work.context.secondary
+   or(not work.primary_requested and p.active~=(work.origin_selected or work.selected)))then
    error('UTILITY_EXIT_SELECTION_CHANGED',0)
   end
   for _,member in ipairs({{pair.utility,work.utility_id},{pair.support,work.ordinary_id}})do
    local item=attached_entity(member[1],member[2])
    if not item or (item.parent~=0 and item.parent~=p.avatar)
-    or(work.utility_exit and item.parent~=p.avatar)then error('PARENT_CHANGED',0)end
+    or((work.utility_exit or work.managed_draw) and item.parent~=p.avatar)then error('PARENT_CHANGED',0)end
   end
   if not work.primary_requested then
    -- Request once. Never force primary again after intervening player input.
@@ -124,7 +134,8 @@ local function service_formation(p,now,input)
   if not work.attached then
    -- Consume attachment before entry; failures cancel, never retry it.
    work.attached=true
-   if not switch_entity(p,step.target,step.id,false,step.label)then error('ATTACH_FAILED',0)end
+   work.outgoing=p.support
+   if not switch_entity(p,step.target,step.id,false,step.label,work.managed_draw)then error('ATTACH_FAILED',0)end
    work.support=step.target
   end
   local after=sample()
@@ -145,6 +156,14 @@ local function service_formation(p,now,input)
   pair.utility_drawn=step.target==pair.utility and work.selected==3
   last_support={entity=pair.support,id=pair.support_id};pending_utility=nil
   formation_pending=nil
+  if work.managed_draw then
+   -- The attachment ran while primary was selected. Acknowledge only after
+   -- the final draw; the HUD callback freshly checks selection and pair identity.
+   local acknowledge=_G.UtilitySupportSlotContext.acknowledge_inventory_change
+   if acknowledge then acknowledge(work.outgoing,step.target,step.label)end
+   emit('CLIENT_DRAW_COMPLETE TARGET='..step.target..' ACTIVE='..work.selected)
+   return
+  end
   if work.utility_exit then
    emit('UTILITY_EXIT_COMPLETE SUPPORT='..pair.support..' RESTORED_SELECTED='..work.selected)
    return

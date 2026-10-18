@@ -310,7 +310,7 @@ do
     end
     if resupply then return resupply(now)end
    end
-   c.emit('PICKUP_FILTER_READY VERSION=0.7.0 AUTOMATIC=true ACTION_POLL_MS=25 SOURCE_REFRESH_MS=250 CACHE_LIMIT=16 SELECTED_SOURCE_ONLY=true NO_PAIR_SCANS=false')
+   c.emit('PICKUP_FILTER_READY VERSION=0.7.1 AUTOMATIC=true ACTION_POLL_MS=25 SOURCE_REFRESH_MS=250 CACHE_LIMIT=16 SELECTED_SOURCE_ONLY=true NO_PAIR_SCANS=false')
   end)
   if not ok then c.emit('PICKUP_FILTER_INIT_ERROR='..tostring(err))end
  end

@@ -1,47 +1,49 @@
-# Utility Support Slot v0.7.1
+# Utility Support Slot
 
 This mod allows you to carry one utility (Solo Silo designator or C4 detonator)
 alongside another support weapon. Two utilities or two ordinary support weapons
 do not form a pair, so you cannot carry two EATs, for example.
 
-This mod is intended for single-player and private lobbies. Please respect other
-players and check with your group before using it.
+This is the HellForge version. The original Lua version is preserved on the
+[legacy branch](https://github.com/MajorXAce/Utility-Support-Slot/tree/legacy)
+and in the older releases.
 
 ## Installation and requirements
 
-Requires **[Bingus Shared Loader](https://github.com/CowboyBingus/BingusSharedLoader/releases)**;
-tested with **v19**. Import the mod ZIP into your mod manager (for example,
-Arsenal), enable **Core** and choose exactly one mode under **Bindings**, then
-deploy and restart the game. Core alone uses Default Bindings. Do not install
-both binding choices manually.
+Requires [HellForge](https://github.com/SkyeShade/HellForge) on game build
+**25480438**, with mod SDK **11 or newer**. Import the release ZIP through
+HellForge's mod manager and enable **Utility Support Slot**, then restart.
+This package is for HellForge, not the current live game.
 
-**Mod Options Menu** and **Mod Bindings Menu v2+** are optional (but recommended)
-and installed separately.
+Remove any older USS test build or Lua copy from the same setup before enabling
+this version. They should not run together.
+
+The C **Mod Options Menu** and **Mod Bindings Menu**, included in CowboyBingus's
+HellForge Vanilla Plus Megapack, are optional. Integration currently supports
+Megapack **0.2.1**. Without both working menus, USS uses its own menu instead.
 
 ## Controls
 
-**Default Bindings:** press your support binding while your support weapon is
-already drawn to swap the pair. On controller, hold the weapon-switch button
-while support is drawn.
+**Default:** press your support binding while your support weapon is already
+drawn to swap the pair. On controller, hold the weapon-switch button while
+support is drawn.
 
-**Dedicated Key:** press **6** by default, or assign **Utility Weapon** through
-Mod Bindings Menu, to draw the utility directly. Pressing it again leaves the
-utility drawn, like vanilla. The other weapon keys behave as normal. If you only
-have a utility weapon, it stays in the support slot and can be drawn with either
-the support weapon binding or the utility weapon binding.
+**Dedicated:** use **Utility Weapon** to draw the utility directly. Pressing it
+again leaves the utility drawn, like vanilla. Other weapon controls behave as
+normal. A lone utility can also be drawn with the normal support control.
 
-With **Mod Options Menu**, open **Options > MODS > Utility Support Slot**, choose
-**Binding Mode** and press **APPLY**. The saved, applied menu choice takes priority
-over your mod manager while the menu is available. Without it, the mod uses the
-mode selected in your mod manager. The menu lets you change modes in-game;
-release the control after changing modes before using it again.
+Without the optional menus, open **Options > USS** to choose Binding Mode and
+assign Utility Weapon. The standalone default is **6**; the assignment accepts
+keyboard or controller input.
 
-With **Mod Bindings Menu**, open the **MODS** tab in the keyboard/controller
-options and bind **Utility Weapon** under **Utility Support Slot**. It starts
-unbound. Once you assign and use it, that binding replaces the INI shortcut for
-the session. If the menu isn't installed or becomes unavailable, the INI shortcut
-is used. If you clear a menu binding after using it, restart the game to use the
-INI shortcut again. The binding is used only in Dedicated Key mode.
+With the optional menus, choose **Binding Mode** under
+**Options > MODS > Utility Support Slot** and press **APPLY**. Assign
+**Utility Weapon** under **Utility Support Slot** on the keyboard/controller
+binding pages. That external binding starts unbound. Release the control after
+changing modes before using it again.
+
+The external menus save their own choices. Your standalone choices are kept
+separately and are used again if the external menus are unavailable.
 
 ## Pickup and recovery
 
@@ -54,87 +56,20 @@ weapon. Dying drops both weapons like vanilla.
 ## Known limitations and multiplayer support
 
 The game still has one support slot. The mod tracks the other weapon separately
-and keeps it attached to your character. I tried my best to make it feel like a
-vanilla feature, but there will be cases where the gaps show.
+and keeps it attached to your character.
 
-Multiplayer was tested while hosting, joining, with both modded and vanilla combinations. Larger groups and extended multiplayer sessions haven't been tested.
+Hosting and joining have been tested with two computers. More players are welcome
+to try it and report issues.
 
-- Resupplying from another player's supply backpack will not refill the weapon
-  being stored by the mod.
+- A brief switch through your primary weapon can be visible during handling.
 - Players joining mid-mission may not see your stored weapon until you swap weapons.
-- Leaving a mission while carrying a pair may cause the stored weapon to be
-  lost. Keep this in mind before leaving; this behavior hasn't been fully
-  tested.
-- Your primary weapon may briefly appear during a swap or replacement especially in default mode.
-- The mod hides extra pickup messages caused by its weapon handling. An incorrect
-  utility pickup message can occasionally appear after replacing an ordinary
-  support weapon while primary or secondary remains held with **Switch Weapon On
-  Pickup** set to **No**. Weapon handling worked correctly in the tested cases;
-  a fix for missed messages is planned for a future update.
-- Replacing support weapons or utilities can cause a noticeable hitch. Normal
-  swaps were stable in my testing; performance work will continue.
-- If something interrupts a weapon swap or pickup, the mod may stop handling
-  weapons to avoid making things worse. Changes already made will remain.
-  Recovery from these interruptions hasn't been tested in-game yet, so you may
-  need to start a new mission if the mod stops responding.
+- Resupplying from another player's supply backpack does not refill the stored weapon.
+- Leaving a mission with a pair may lose the stored weapon.
+- Mods that change support weapon pickup or inventory slots can conflict with USS.
 
-## Compatibility
+## Building
 
-Mods that change support weapon pickups or let you carry support weapons in other
-inventory slots may conflict with this mod. This mod only pairs
-weapons picked up through the normal support slot; weapons in primary or secondary
-aren't included in its pair. Other mods may redirect pickups away from that slot
-or interfere with how carried weapons are handled.
-
-**Second Amendment to Liberty is currently incompatible with this mod's paired
-weapon handling.** Testing both mods together caused pickup prompts to appear on
-carried weapons managed by this mod. Use the mods separately for now.
-
-Other mods that change support weapon pickups or slots haven't been fully tested.
-If you encounter similar issues, try disabling those mods.
-
-## Future plans
-
-I'd like to improve a few things in future updates:
-
-- Smoother swaps without briefly switching to your primary weapon.
-- Support for melee support weapons, with an option to treat them as a utility
-  or an ordinary support weapon. This would let you pair one with a gun or with
-  Solo Silo/C4, depending on your preference. The setting would be available
-  through Mod Options Menu, with a mod manager option as the fallback.
-- Support for melee secondaries as utilities. They would always replace your
-  current utility and keep your ordinary support weapon. This depends on finding
-  a reliable way to drop, pick up and recover them.
-- Further performance improvements and fixes for the remaining pickup messages.
-
-Melee support still needs testing before I can confirm which weapons will work.
-
-## INI and logging
-
-An INI file is created on startup where you can change the shortcut key and
-logging level:
-
-`%APPDATA%\Arrowhead\Helldivers2\utility_support_slot.ini`
-
-```ini
-utility_key=6
-log_level=error
-```
-
-Edit the settings and restart the game. You can change `utility_key` for
-Dedicated Key mode if you aren't using Mod Bindings Menu. It accepts a-z, 0-9,
-f1-f12, numpad0-numpad9, page up/down, home/end and insert/delete.
-
-Find **UtilitySupportSlot.log** in Bingus Shared Loader's log folder:
-
-`%LOCALAPPDATA%\CowboyBingus\Helldivers2\Logs\UtilitySupportSlot.log`
-
-`error` is the default and reports failures, so a clean session may leave an
-empty file. `info` includes readiness/mode messages, and `debug` includes detailed
-weapon, HUD and resupply events. For an issue report, include the mod version,
-whether you were hosting or joining, both weapons, the **Switch Weapon On Pickup**
-setting, binding mode, what each player saw and the relevant log. Raising logging
-requires an INI edit and restart.
+Source and offline checks are included. See [BUILDING.md](BUILDING.md).
 
 ## License
 
@@ -148,12 +83,12 @@ Game Studios or Sony Interactive Entertainment.
 The gameplay logic is mine, but I had **GPT-6.1 Sol**
 help with research, implementation, debugging, and documentation.
 
-Big thanks to **CowboyBingus**, the creator of **Bingus Shared Loader**,
-**Mod Options Menu**, and **Mod Bindings Menu**. Bingus Shared Loader provides
-mod loading and logging, and this mod wouldn't exist without it. The optional
-menus make configuration and keybinding easier.
+Big thanks to **CowboyBingus** for the Bingus Shared Loader, Mod Options Menu and
+Mod Bindings Menu. The original Lua version and the native menu work benefited
+from these projects. Reused menu code is covered by the included
+[Zero-Clause BSD license](THIRD_PARTY_LICENSES.txt).
 
-I'd also like to thank **SkyeShade**, creator of **HD2Runtime**, and **notzelda**,
-creator of **LinksLinkToMemory**, for their development and research tools. They
-helped me inspect live game state, understand weapon and multiplayer behavior,
-and run experiments throughout development.
+I'd also like to thank **SkyeShade**, creator of HellForge and HD2Runtime, and
+**notzelda**, creator of LinksLinkToMemory, for their development and research
+tools. They helped me inspect live game state, understand weapon and multiplayer
+behavior, and run experiments throughout development.

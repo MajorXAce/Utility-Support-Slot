@@ -1,0 +1,15 @@
+{
+  "sdk": 16,
+  "minimum_runtime_sdk": 11,
+  "game_build": "25480438",
+  "reference_commit": "c01f36b12a72ffb6f1af8e5096d2634bba2f2d7f",
+  "headers": {
+    "hellforge_mod.h": "b1efe148269c38a6087841adfaa74c079ae5d4ad89ae0561f000f8f84a3ccb09",
+    "hellforge_components.h": "7b4eed115981b8b54df9b144d319b384cb7a22184ea4ef11293cf78ab0cf0eb7",
+    "hellforge_content.h": "2e8006cf56c6582ba2fe9f84e1df03bacdde7ffb48eb945c7f4c68cb34533b03",
+    "hellforge_functions.h": "d05e57ce09c898b97ec44f0ff9380d2b1ee5ab6d47c591786477b3d24a688ab7",
+    "hellforge_globals.h": "db406783fbe93313709a8bb3c1b46d2b82c5a2d94534f976d2914ba1623b2382"
+  },
+  "compiler_version": "0.17.0",
+  "compiler_sha256": "f54b14f02a4d7d8ac62a94a0663486eb166bba3745d85b466238c1b93e723d46"
+}

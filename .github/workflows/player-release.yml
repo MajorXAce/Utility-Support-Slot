@@ -1,5 +1,4 @@
 name: Prepare player release
-
 on:
   workflow_dispatch:
     inputs:
@@ -8,34 +7,39 @@ on:
         type: boolean
         required: true
         default: false
-
 permissions:
   contents: write
-
 concurrency:
   group: player-release
   cancel-in-progress: false
-
 jobs:
   release:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Build and verify public source
-        run: |
-          python tools/build_release.py
-          python tools/verify_public.py
-      - name: Prepare the exact player ZIP and release
+      - name: Fetch reviewed public SDK headers
+        run: python Tools/sdk_inputs.py --fetch
+      - name: Test, build and package
+        run: python Tools/build.py --compiler msvc --test --package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Utility-Support-Slot
+          path: dist/*.zip
+      - name: Create release
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           PUBLISH_RELEASE: ${{ inputs.publish }}
         run: |
-          if [ "$PUBLISH_RELEASE" = "true" ]; then
-            python tools/github_release.py --execute --publish
-          else
-            python tools/github_release.py --execute
-          fi
+          $version = (Get-Content VERSION -Raw).Trim()
+          $tag = "v$version"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists; preserve its files." }
+          $releaseArgs = @('release', 'create', $tag, "dist/Utility-Support-Slot-v$version.zip", '--target', '${{ github.sha }}', '--title', "Utility Support Slot $version", '--notes-file', 'release_notes.md')
+          if ($env:PUBLISH_RELEASE -ne 'true') { $releaseArgs += '--draft' }
+          & gh @releaseArgs
+          if ($LASTEXITCODE -ne 0) { throw 'Release creation failed' }

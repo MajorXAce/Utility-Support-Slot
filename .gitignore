@@ -1,4 +1,8 @@
-__pycache__/
-*.pyc
+build/
 dist/
-local-evidence/
+.sdk/
+__pycache__/
+*.dll
+*.exe
+*.obj
+*.pdb

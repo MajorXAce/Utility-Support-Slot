@@ -1,58 +1,35 @@
 # Building Utility Support Slot
 
-This repository contains the readable Lua source and the files used to build the
-installable mod. Python 3.10 or newer is required; building does not require the
-game, HD2Runtime or a memory tool.
+Players only need the release ZIP. These instructions are for building from source
+on Windows x64. Builds do not install the mod or start the game.
 
-```sh
-python tools/verify_public.py
-python tools/build_release.py
-python tools/verify_public.py
-python tools/package_public.py --output-dir dist
+Install Python3.10+ and Visual Studio C++ Build Tools, including MSVC and a Windows
+SDK. The build tool locates its x64 developer environment automatically.
+
+Fetch the five public SDK headers at the reviewed HellForge commit:
+
+```powershell
+python Tools/sdk_inputs.py --fetch
+python Tools/build.py --compiler msvc --test --package
 ```
 
-The first check verifies the checked-in snapshot. After source edits, build first,
-then verify. Core and the two binding choices stay at the repository root so an
-installable ZIP keeps the same Arsenal layout. Only the approved installable
-files enter that ZIP; Source/, tools/ and this guide stay in the source repo.
-The packager reuses an identical ZIP and refuses to replace a version ZIP with
-different content. Use a separate draft directory while developing a release.
+Downloads are hash-checked against Tools/sdk_baseline.json and stored in ignored
+.sdk/. Alternatively set USS_SDK to your own directory containing those exact
+headers. No game binaries, SDK binaries or private development evidence are needed.
 
-Edit named Source/*.lua factories, then build to assemble their embedded copies.
-Keep the readable Lua; there is no minification step. Verification checks assembly,
-resource identities, preserved inert resources, reviewed source fingerprints and
-exact source/patch agreement. It does not execute native gameplay or establish
-multiplayer behavior; testing scope and known issues are in README.md.
+The DLL and receipt are in build/. The player ZIP is in dist/. Existing ZIPs are
+never replaced with different bytes under the same version; use a new candidate
+identifier while iterating. No credentials, settings or source are included in the
+player ZIP. Source remains available here on GitHub.
 
-## Changing player-facing text
+Zig is optional: set USS_ZIG to the reviewed0.17.0 executable and pass
+--compiler zig. The Windows MSVC build does not require Zig.
 
-Edit PLAYER_FACING_CONFIG.json, then preview the affected files:
+The manual GitHub release workflow runs the offline checks, builds and packages
+from main, and creates a draft by default. Review its files and notes before
+publishing. Existing version tags are not moved. Lua history and its old workflow
+are preserved on the legacy branch.
 
-```sh
-python tools/player_config.py preview
-python tools/player_config.py apply
-python tools/build_release.py
-python tools/verify_public.py
-```
-
-The tool coordinates display text, version messages and the reference inventory.
-Renaming the Arsenal title updates unchanged category names; renaming an Arsenal
-binding choice updates its matching in-game choice.
-It preserves saved identifiers, resource paths and behavioral defaults, and stops
-if owned text has been edited elsewhere. Review the diff before applying it.
-The applied snapshot and reviewed fingerprints are updated only for the declared
-text transformation. New gameplay changes need independent review and testing.
-README prose is retained, with matching display names updated outside code and
-link destinations; review any surrounding sentences after changing terminology.
-
-PUBLIC_EXPORT.json records the development revision and hashes of the approved
-exported files. The public repository has independent history; private research,
-logs, personal paths and local test tools are not included. Building or packaging
-never uploads, commits, tags or publishes a release.
-
-## GitHub releases
-
-On the public repository, open Actions > Prepare player release > Run workflow
-on main. Leave Publish immediately off for a draft you can inspect first. The
-workflow takes its tag from VERSION and uploads only the player ZIP; it refuses
-an existing tag or release. Source pushes alone do not publish releases.
+72 offline suites validate owned fixtures and refusal paths; passing them is not
+in-game or multiplayer proof. Release0.8.0 is based on the gameplay/menu candidate
+accepted during development. Future game builds need a separate compatibility review.

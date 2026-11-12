@@ -1,12 +1,12 @@
-# Utility Support Slot v0.7.1
+# Utility Support Slot 0.8.0
 
-## Fixes
+Utility Support Slot is now available as a native C mod for HellForge.
+Carry a Solo Silo designator or C4 detonator alongside another support weapon,
+using normal support controls or a dedicated Utility Weapon binding.
 
-- Fixed paired weapons being invisible to the host when using the mod as a client.
-- Fixed incorrect utility animations during those swaps and extra pickup
-  messages caused by the new draw sequence.
+Includes its own in-game settings menu. With the supported C Mod Options Menu
+and Mod Bindings Menu from the Vanilla Plus Megapack installed, USS uses those menus instead. Neither menu is
+required, and no Lua loader is needed.
 
-Larger groups and full multiplayer sessions need more testing.
-
-Your primary weapon may briefly appear during a swap. Other existing limitations
-and compatibility advice are listed in the [README](README.md).
+This release is for HellForge game build25480438. The original Lua releases
+remain available on the legacy branch and in the release history.

@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "id": "majorxace.utility-support-slot",
+  "name": "Utility Support Slot",
+  "version": "0.8.0",
+  "description": "Carry a Solo Silo designator or C4 detonator alongside another support weapon. Choose normal support controls or a separate Utility Weapon binding.",
+  "icon": "icon.png",
+  "url": "https://github.com/MajorXAce/Utility-Support-Slot",
+  "gameplay": true,
+  "code": {
+    "dll": "utility_support_slot.dll",
+    "sdk": 11,
+    "prebuilt": true,
+    "game": "25480438"
+  }
+}

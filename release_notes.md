@@ -11,12 +11,12 @@ Support Slot (game build 25480438).
 - Resupply no longer tries to refill one-shot support weapons added by other
   mods, such as the EAT-77 clones.
 - The pickup prompt no longer stays up for a weapon you are carrying in storage.
-- Other players' pings can no longer target the weapon you have stored, matching
+- Pings can no longer target the weapon you have stored, matching
   the original Lua version.
 - If the stored weapon disappears, the pair is cleared cleanly, and the log now
   names the weapons and the reason when a check is declined.
 - The supported Mod Options Menu and Mod Bindings Menu are now recognized by
-  their API version instead of one exact file, so newer releases of those menu
+  their API version instead of one exact file, so older and newer releases of those menu
   mods keep working with this version.
 
 ## Known issue

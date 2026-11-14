@@ -477,7 +477,7 @@
     },
     "release_notes.md": {
       "source": "PublicRelease/release_notes.md",
-      "sha256": "cc2639a58ceea4d6fd6c9aba0fcf06539fe8c3e001b3d779a59c8ccdaf39f871"
+      "sha256": "ada49e4b53981d0cac6137fdebe1ab0e746562e5f140b609aa9a4bed98dee7dd"
     },
     "src/action_state.h": {
       "source": "src/action_state.h",

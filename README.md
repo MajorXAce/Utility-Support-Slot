@@ -80,7 +80,7 @@ Game Studios or Sony Interactive Entertainment.
 
 ## Credits
 
-The gameplay logic is mine, but I had **GPT-6.1 Sol**
+The gameplay logic is mine, but I had **GPT-6.1 Sol** and **Claude**
 help with research, implementation, debugging, and documentation.
 
 Big thanks to **CowboyBingus** for the Bingus Shared Loader, Mod Options Menu and

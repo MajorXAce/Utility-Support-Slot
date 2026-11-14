@@ -51,11 +51,13 @@ typedef struct UssVpmMenus {
 } UssVpmMenus;
 #define USS_VPM_MODE_ID "majorxace.uss.binding_mode"
 #define USS_VPM_BINDING_ID "majorxace.uss.utility_weapon"
+/* Version1 may append fields; USS reads only this known prefix. Existing
+ * function layout and required operations must remain compatible. Unused
+ * provider metadata is not an admission condition. */
 static inline int uss_vpm_tables_valid(const UssVpmOptionsApi* options,const UssVpmBindingsApi* bindings)
 {
-    return options && bindings && options->version==1 && options->size==56 &&
-        options->metadata0==112 && options->metadata1==64 &&
-        bindings->version==1 && bindings->size==56 && bindings->metadata0==388 && !bindings->metadata1 &&
+    return options && bindings && options->version==1 && options->size>=sizeof(UssVpmOptionsApi) &&
+        bindings->version==1 && bindings->size>=sizeof(UssVpmBindingsApi) &&
         options->register_option && options->get && options->ready &&
         bindings->register_binding && bindings->down && bindings->ready;
 }

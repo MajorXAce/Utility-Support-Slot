@@ -18,11 +18,7 @@ typedef struct UssRefillTargetIo {
 } UssRefillTargetIo;
 static inline int uss_refill_pair_eligible(const UssRefillPairView* p)
 {
-    static const unsigned char expendables[][8]={
-        {0xd3,0x01,0x69,0xed,0xa0,0x2f,0x93,0x80},{0xc7,0x38,0xac,0x65,0x27,0x64,0x17,0x76},
-        {0x9e,0x5f,0x60,0x85,0xd1,0xe0,0xb5,0xb2},{0xcb,0x16,0x2b,0x14,0x3d,0x12,0x90,0x59},
-        {0x77,0x9b,0xa5,0x0a,0x49,0x9d,0x6c,0xb1},{0xfc,0x31,0xaa,0x4a,0x1a,0xe8,0x54,0x5c}};
-    static const unsigned char zero[8]={0};unsigned i;
+    static const unsigned char zero[8]={0};
     if(!p || !p->valid || !p->mission || !p->ready || !p->formed || p->busy || p->down ||
         !p->epoch || !p->context_generation || !p->pair_generation || !p->guard_generation ||
         !p->owner || !p->inventory || !p->avatar || p->avatar==UINT32_MAX ||
@@ -33,8 +29,8 @@ static inline int uss_refill_pair_eligible(const UssRefillPairView* p)
         !memcmp(p->ordinary_identity,zero,8) ||
         uss_classify_support(p->utility_identity,2)!=USS_UTILITY_SUPPORT ||
         uss_classify_support(p->ordinary_identity,2)!=USS_ORDINARY_SUPPORT)return 0;
-    for(i=0;i<sizeof(expendables)/sizeof(expendables[0]);++i)
-        if(!memcmp(p->ordinary_identity,expendables[i],8))return 0;
+    /* Single-use weapons are never refilled: built-in ids plus run-time clones of them (weapon_policy.h). */
+    if(uss_is_expendable_support(p->ordinary_identity))return 0;
     return 1;
 }
 static inline int uss_refill_pair_same(const UssRefillPairView* a,const UssRefillPairView* b)

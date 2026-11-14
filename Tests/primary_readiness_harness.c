@@ -1,7 +1,9 @@
 #ifdef NDEBUG
 #error Primary readiness checks require active assertions
 #endif
+#ifndef USS_FIXTURE_SEGMENTS
 #define USS_FIXTURE_SEGMENTS 48
+#endif
 #define USS_ACTION_TEST_MAIN action_regression_checks
 #include "action_state_harness.c"
 #include "../src/primary_readiness.h"
@@ -74,7 +76,10 @@ static void predicate_cases(void)
         primary_predicate(&result,&owner);assert(result.ready==cases[i].ready);
     }
 }
-int main(void)
+#ifndef USS_PRIMARY_TEST_MAIN
+#define USS_PRIMARY_TEST_MAIN main
+#endif
+int USS_PRIMARY_TEST_MAIN(void)
 {
     UssPrimaryReadiness result;unsigned total,i;unsigned char* row;
     assert(action_regression_checks()==0);predicate_cases();

@@ -16,11 +16,14 @@ typedef struct UssAutomaticIo {
     /* Fresh adapter/services per admitted intent; no reuse of previous consumed
      * entry bits or descriptor anchors. Called once, never retried. */
     int (*prepare_replace)(void*,UssReplacementWork*,const UssReplacementOrigin*,UssReplacementServices*);
+    /* Optional pickup-prompt hygiene for carried pair members (uss_zone_hygiene.h). Returns 1 after a native call. */
+    unsigned (*zone_hygiene)(void*,UssCoreLifecycle*,const UssCoreObservation*,uint64_t);
 } UssAutomaticIo;
 typedef struct UssAutomaticController {
     UssFormationRuntime* formation;const HfApi* api;HfMod* mod;UssCorePlatform platform;UssAutomaticIo io;
     UssReplacementOrigin origin;UssReplacementWork replacement;UssReplacementServices services;
     unsigned origin_valid,stopped;uint64_t origin_ms;UssPickupKind decision;const char* reason;
+    uintptr_t refusal_signature; /* last logged candidate refusal; avoids repeating one log line */
 } UssAutomaticController;
 static inline unsigned automatic_stop(UssAutomaticController* c,const char* reason)
 {c->stopped=1;c->origin_valid=0;c->reason=reason;return USS_CONTROL_STOP;}
@@ -38,6 +41,7 @@ static inline unsigned uss_automatic_control(void* user,UssCoreLifecycle* life,
     UssAutomaticController* c=(UssAutomaticController*)user;UssFormationRuntime* r;
     UssPairMember incoming;UssCoreCandidateNames names;UssCoreCandidates bundle;UssCoreFlags flags;
     UssPickupPolicy policy={0};UssPickupDecision decision={0};unsigned pass,policy_attempted=0;
+    Reader refusal={0};
     if(!c || !c->formation)return USS_CONTROL_STOP;r=c->formation;
     if(c->stopped || life!=&r->life)return automatic_stop(c,"CONTROLLER_OWNER_CHANGED");
     if(!current || !lifecycle_current(life,r->thread,current)){
@@ -79,8 +83,19 @@ static inline unsigned uss_automatic_control(void* user,UssCoreLifecycle* life,
             /* Normal update already verified both owned members coherently. */
             memset(&bundle,0,sizeof(bundle));bundle.valid=1;bundle.current=*current;bundle.names=names;
             bundle.members[0]=incoming.entity==life->owner.utility.entity?current->utility:current->ordinary;
-        }else bundle=uss_core_observe_candidates(c->api,c->mod,&life->owner,&flags,&c->platform,&names,NULL);
-        if(!bundle.valid){c->origin_valid=0;c->reason="CANDIDATE_READ_UNAVAILABLE";return USS_CONTROL_WORK;}
+        }else bundle=uss_core_observe_candidates(c->api,c->mod,&life->owner,&flags,&c->platform,&names,&refusal);
+        if(!bundle.valid){
+            /* Log-only: which reader gate refused this candidate. Repeated identical refusals log once. */
+            uintptr_t signature=(uintptr_t)refusal.failure*31u+(uintptr_t)refusal.stage*17u+incoming.entity+refusal.diag_native_kind*7u+refusal.diag_effective_kind+(uintptr_t)refusal.diag_fallback*13u;
+            if(c->api && c->api->log && signature!=c->refusal_signature){
+                uint64_t identity;memcpy(&identity,incoming.identity,8);
+                c->api->log(c->mod,"USS candidate refused failure=%s stage=%s slot=%d entity=%u identity=%016llx native_kind=%u effective_kind=%u support_proof=%s",
+                    refusal.failure?refusal.failure:"NONE",refusal.stage?refusal.stage:"NONE",refusal.slot,
+                    (unsigned)incoming.entity,(unsigned long long)identity,(unsigned)refusal.diag_native_kind,(unsigned)refusal.diag_effective_kind,
+                    refusal.diag_fallback?refusal.diag_fallback:"NOT_RUN");
+                c->refusal_signature=signature;
+            }
+            c->origin_valid=0;c->reason="CANDIDATE_READ_UNAVAILABLE";return USS_CONTROL_WORK;}
         decision=uss_pickup_step(&r->history,life,r->thread,&bundle,&policy);
         /* The real preference is read only when the pickup decision needs it.
          * Idle managed pairs and utility-first formation do not poll settings.
@@ -128,6 +143,9 @@ static inline unsigned uss_automatic_control(void* user,UssCoreLifecycle* life,
     }
     if(decision.kind==USS_PICKUP_MANAGED){
         UssReplacementOrigin origin={0};
+        /* Idle managed pair only: no formation, replacement or recovery is active on this path. */
+        if(c->io.zone_hygiene && bundle.current.valid && c->io.zone_hygiene(c->io.user,life,&bundle.current,now)){
+            c->origin_valid=0;c->reason="ZONE_HYGIENE";return USS_CONTROL_WORK;}
         /* Bounded observation reuse only; replacement entry still checks fresh
          * mapping/context. Selection/lifetime changes bypass the100ms cadence. */
         if(c->origin_valid && now>=c->origin_ms && now-c->origin_ms<100 &&

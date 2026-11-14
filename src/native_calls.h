@@ -13,6 +13,8 @@ typedef void (*UssDropEntityFn)(void*,uint32_t,uint32_t,uint8_t,void*,uint8_t);
 typedef void (*UssDropSlotFn)(void*,uint32_t,uint32_t,uint32_t);
 typedef void (*UssSendInventoryFn)(int64_t,uint32_t,uint32_t,uint32_t,uint32_t,
                                     uint32_t,uint32_t,uint64_t);
+typedef void (*UssZoneCloseFn)(void*,uint32_t,uint32_t,uint8_t); /* events manager, entity, zone, open(0 = close) */
+typedef void (*UssFilterCommandFn)(uint32_t*,uint32_t,uint32_t); /* physics actors, count, filter catalog hash */
 typedef struct UssNativeCalls {
     UssAttachFn attach;
     UssSelectStateFn select_state;
@@ -20,6 +22,7 @@ typedef struct UssNativeCalls {
     UssDropEntityFn drop_entity;
     UssDropSlotFn drop_slot;
     UssSendInventoryFn send_inventory;
+    UssZoneCloseFn zone_close;
 } UssNativeCalls;
 
 typedef enum UssCallResult {
@@ -69,6 +72,12 @@ static inline UssCallResult uss_send_inventory(const UssNativeCalls* calls,
     if (!calls || !calls->send_inventory || !message) return USS_CALL_NOT_ENTERED;
     calls->send_inventory(INT64_C(-2),message->avatar,message->primary,message->secondary,
         message->support,message->backpack,message->row_field24,message->metadata);
+    return USS_CALL_RETURNED;
+}
+static inline UssCallResult uss_close_pickup_zone(const UssNativeCalls* calls,void* events,uint32_t entity,uint32_t zone)
+{
+    if (!calls || !calls->zone_close || !events || !entity) return USS_CALL_NOT_ENTERED;
+    calls->zone_close(events,entity,zone,(uint8_t)0);
     return USS_CALL_RETURNED;
 }
 #endif

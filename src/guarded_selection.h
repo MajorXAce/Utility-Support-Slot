@@ -31,7 +31,8 @@ static int same_selection_context(const UssActionState* a,const UssActionState* 
         !memcmp(x->avatar_header,y->avatar_header,sizeof(x->avatar_header)) &&
         !memcmp(x->slots,y->slots,sizeof(x->slots)) &&
         !memcmp(x->identities,y->identities,4*sizeof(x->identities[0])) &&
-        !memcmp(x->observed_kinds,y->observed_kinds,4*sizeof(x->observed_kinds[0]));
+        !memcmp(x->observed_kinds,y->observed_kinds,4*sizeof(x->observed_kinds[0])) &&
+        !memcmp(x->native_kinds,y->native_kinds,4*sizeof(x->native_kinds[0]));
 }
 
 static UssSelectionResult select_guarded_internal(const HfApi* api,HfMod* mod,

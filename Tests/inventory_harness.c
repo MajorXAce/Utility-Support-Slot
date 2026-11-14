@@ -19,8 +19,8 @@ static Reader last_reader;
 static char last_log[1024];
 static unsigned changing_kind,kind_reads;
 static unsigned module_calls,module_change;
-static char token;
-#define MOD ((HfMod*)&token)
+static char inventory_mod_marker;
+#define MOD ((HfMod*)&inventory_mod_marker)
 #define BASE ((uintptr_t)0x10000000)
 static void put32(void* p,uint32_t v){memcpy(p,&v,4);}
 static void putptr(void* p,uintptr_t v){memcpy(p,&v,8);}

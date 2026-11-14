@@ -6,10 +6,12 @@
 #include "formation_native.h"
 #include "replacement_adapter.h"
 #include "local_replacement_adapter.h"
+#include "uss_zone_hygiene.h"
 typedef struct UssAutomaticNative {
     UssAutomaticController* controller;UssFormationNative* formation;
     UssReplacementOriginEvidence origin;UssReplacementAdapter adapter;
     UssLocalReplacementAdapter local;
+    UssZoneHygiene hygiene; /* optional; inert until uss_automatic_native_enable_zone_hygiene */
     void* policy_user;int (*pickup_policy)(void*,UssPickupPolicy*);
     void* invoke_user;
     int (*invoke)(void*,UssReplacementEffect,uintptr_t,uintptr_t,uintptr_t,uintptr_t,uint32_t,uint32_t,const UssInventoryMessage*);
@@ -56,6 +58,18 @@ static inline int automatic_native_prepare(void* user,UssReplacementWork* work,
         !uss_replacement_adapter_init(&native->adapter,&producer,&native->formation->runtime->life,
             &native->formation->runtime->publication,native->invoke,native->invoke_user))return 0;
     *out=uss_replacement_adapter_services(&native->adapter);return 1;
+}
+static inline unsigned automatic_native_zone_hygiene(void* user,UssCoreLifecycle* life,const UssCoreObservation* current,uint64_t now)
+{
+    UssAutomaticNative* native=(UssAutomaticNative*)user;
+    return uss_zone_hygiene_step(&native->hygiene,life,current,native->formation->api,native->formation->mod,now);
+}
+/* Optional. Call after uss_automatic_native_init (which clears this state on actor retirement). */
+static inline void uss_automatic_native_enable_zone_hygiene(UssAutomaticNative* native,UssZoneCloseInvoke invoke,void* user)
+{
+    if(!native || !invoke || !native->controller)return;
+    native->hygiene.invoke=invoke;native->hygiene.invoke_user=user;
+    native->controller->io.zone_hygiene=automatic_native_zone_hygiene;
 }
 static inline int uss_automatic_native_init(UssAutomaticNative* native,UssAutomaticController* controller,
     UssFormationNative* formation,int (*policy)(void*,UssPickupPolicy*),void* policy_user,

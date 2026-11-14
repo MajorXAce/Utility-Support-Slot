@@ -28,5 +28,11 @@ int main(void)
         memset(&target,0xa5,sizeof(target));copy=target;assert(!uss_refill_target_read(&io,&target) && !memcmp(&target,&copy,sizeof(target)));}
     pair_fixture();{static const unsigned char expendable[8]={0xd3,0x01,0x69,0xed,0xa0,0x2f,0x93,0x80};
         memcpy(pair.ordinary_identity,expendable,8);assert(!uss_refill_pair_eligible(&pair));}
+    /* A run-time clone of an expendable (for example EAT-77, a copy of the EAT-17) is excluded too; others still pass. */
+    pair_fixture();{unsigned char clone[8]={0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88};
+        uss_derived_support_reset();
+        memcpy(pair.ordinary_identity,clone,8);assert(uss_refill_pair_eligible(&pair));
+        assert(uss_derived_support_add(clone,USS_SUPPORT_TYPE_EXPENDABLE) && !uss_refill_pair_eligible(&pair));
+        uss_derived_support_reset();assert(uss_refill_pair_eligible(&pair));}
     puts("USS refill target: concrete ammo/settings, pair lifetime, attachment, busy/down, active ordinary and expendable exclusion PASS");return 0;
 }

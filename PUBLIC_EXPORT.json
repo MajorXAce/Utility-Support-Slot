@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "implementation": "HellForge C",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "files": {
     ".gitattributes": {
       "source": "PublicRelease/.gitattributes",
@@ -17,7 +17,7 @@
     },
     "BUILDING.md": {
       "source": "PublicRelease/BUILDING.md",
-      "sha256": "9de43abf47a996df195ad3e086b64a3e38f66bfbf34b84d43a364d50b1b9c884"
+      "sha256": "68ba5c8d48879a263bc14d9082651f089e12dcdf0438b38572c2e664fc69cfb4"
     },
     "LICENSE": {
       "source": "PublicRelease/LICENSE",
@@ -41,7 +41,7 @@
     },
     "ResearchSource/inventory_reader.h": {
       "source": "ResearchSource/inventory_reader.h",
-      "sha256": "0c85aa91047cfb72b0de87c1ad7a8c7cb9dc4047a1d1e5de12bb14334b3669bd"
+      "sha256": "74cf74d908e18a22088c62ffc9b692b146cf27b76da82c3997a7636baa420f44"
     },
     "ResearchSource/replacement_probe.c": {
       "source": "ResearchSource/replacement_probe.c",
@@ -79,6 +79,10 @@
       "source": "Tests/core_observation_harness.c",
       "sha256": "95cd75f405128890f3a79df3b991132c2091431636680a80904a78655abfbda6"
     },
+    "Tests/custom_support_harness.c": {
+      "source": "Tests/custom_support_harness.c",
+      "sha256": "3300577aad0d76da483185158a07c019be1e5b88e1ddb87804892e1e6169f420"
+    },
     "Tests/formation_command_harness.c": {
       "source": "Tests/formation_command_harness.c",
       "sha256": "1118f14d1fc5654b377c903017a4297b1c27243f2409e6ed5124e1c7e527f2c5"
@@ -101,7 +105,7 @@
     },
     "Tests/inventory_harness.c": {
       "source": "Tests/inventory_harness.c",
-      "sha256": "e6677673dfde28c4de4250aa13ca2622f524519ab2afac2579339a2a115b8260"
+      "sha256": "626940ba769dde7369c7eceaea5824d4a0f758a474d0af0b3e4c8f7a9655a316"
     },
     "Tests/native_calls_harness.c": {
       "source": "Tests/native_calls_harness.c",
@@ -125,7 +129,7 @@
     },
     "Tests/primary_readiness_harness.c": {
       "source": "Tests/primary_readiness_harness.c",
-      "sha256": "7ba109af3e9ba970d285fc63816baef9f9808f5bdf0090360bf665169bc14194"
+      "sha256": "0ae6ee932d9b9eba66953aa9b1b99f8eaf33f93d22dfb8c2f760456de2a57090"
     },
     "Tests/probe_harness.c": {
       "source": "Tests/probe_harness.c",
@@ -351,13 +355,25 @@
       "source": "Tests/uss_pickup_readers_harness.c",
       "sha256": "29d9a6a40a6e060e4d192359ea43922f7cc9e733334c79050a6035d229dd3cc6"
     },
+    "Tests/uss_ping_desired_harness.c": {
+      "source": "Tests/uss_ping_desired_harness.c",
+      "sha256": "0f733d052269d53a80b8e0a0d08f6eb7da992b9498827023e150c493373437b5"
+    },
+    "Tests/uss_ping_filter_harness.c": {
+      "source": "Tests/uss_ping_filter_harness.c",
+      "sha256": "a9850dff8546b119cf419dbe06dbdec15c74aafbbeca41ac59c9c8d12b4f1e58"
+    },
+    "Tests/uss_ping_filter_native_harness.c": {
+      "source": "Tests/uss_ping_filter_native_harness.c",
+      "sha256": "d163d9bddda196ce6841ec742baa6debf7c26a5059210b254fb1ca001ccf6fe1"
+    },
     "Tests/uss_player_control_harness.c": {
       "source": "Tests/uss_player_control_harness.c",
       "sha256": "dec0eb87537e5de12e4f2fb1d99777d6796b65cb9d0e2020c0cf22c317730350"
     },
     "Tests/uss_recovery_harness.c": {
       "source": "Tests/uss_recovery_harness.c",
-      "sha256": "43ec2c12b2e567cae1507cafab62aa9da435147d13246a4e175cfc16bd778baf"
+      "sha256": "bca25dc9d8866ffbc35a411b92c0b0b381e086642753baaa273ae8694d7edaaa"
     },
     "Tests/uss_refill_amount_harness.c": {
       "source": "Tests/uss_refill_amount_harness.c",
@@ -385,7 +401,7 @@
     },
     "Tests/uss_refill_target_harness.c": {
       "source": "Tests/uss_refill_target_harness.c",
-      "sha256": "23d5f720a75f33ea8f46018aea927aa1947651f77ed9ae1708ac80f009ee8771"
+      "sha256": "50e9ccec21bbe54c7357edc618b48827c8c589d0b1768b3855038fa4feb25895"
     },
     "Tests/uss_refill_transaction_harness.c": {
       "source": "Tests/uss_refill_transaction_harness.c",
@@ -419,9 +435,17 @@
       "source": "Tests/uss_vpm_menus_harness.c",
       "sha256": "c0eff9688e3e27b181239e08bc5576e35970a1cb7da79f8a8d1b95c3e2ef049a"
     },
+    "Tests/uss_vpm_windows_harness.c": {
+      "source": "Tests/uss_vpm_windows_harness.c",
+      "sha256": "f68a68d77fc8e863be2e6d3bc3eb3c63f2550928b06f28e5ef300a327b17d91b"
+    },
+    "Tests/uss_zone_hygiene_harness.c": {
+      "source": "Tests/uss_zone_hygiene_harness.c",
+      "sha256": "f9ea4155d50940b019a42d7b25f337cab130a3207b3a64d5f7c717b7fb5d821a"
+    },
     "Tests/weapon_policy_harness.c": {
       "source": "Tests/weapon_policy_harness.c",
-      "sha256": "d77b5297ca3de16e6e143de35068ca7df53f13767a8a01de40905b616032ff0c"
+      "sha256": "39aa76b3b95b4de0cebcf3b3a69d31e6466bf4fb5a3f88c6195a571dc36f58cc"
     },
     "Tools/build.py": {
       "source": "PublicRelease/Tools/build.py",
@@ -429,7 +453,7 @@
     },
     "Tools/check_current.py": {
       "source": "PublicRelease/Tools/check_current.py",
-      "sha256": "cf6ee9657caf960e2f868b8b84cc52bde84bfa4b0974da094e389f2bbaa1cf3f"
+      "sha256": "02ee1b44c5a28af7d4b5fc69e2aac4b13de296c2fa1aec0692fd37455d13e9a3"
     },
     "Tools/sdk_baseline.json": {
       "source": "PublicRelease/Tools/sdk_baseline.json",
@@ -441,11 +465,11 @@
     },
     "VERSION": {
       "source": "PublicRelease/VERSION",
-      "sha256": "a66780da23103beaf12432b418508966b31a2a3a787f9468a5b6cdaa8667c1ef"
+      "sha256": "aaf6721dc37c40b4233accfc081f25776ff3bd1d2a4b9d5cea760d1c2cf86665"
     },
     "hellforge-mod.json": {
       "source": "PublicRelease/hellforge-mod.json",
-      "sha256": "c03344c7641b7b0564f333ae4a6e485c7704eadf50059c9eb223aba059e42661"
+      "sha256": "0125ce6b32f4b83fb8a856b58c0f48bd0839ba8d11622fbceda1fb32fa50fa23"
     },
     "icon.png": {
       "source": "PublicRelease/icon.png",
@@ -453,7 +477,7 @@
     },
     "release_notes.md": {
       "source": "PublicRelease/release_notes.md",
-      "sha256": "26aafa9c059a14c1c0e3bfabfdf18a34b28c8ccb74840dbb4eac0773a0f3120a"
+      "sha256": "cc2639a58ceea4d6fd6c9aba0fcf06539fe8c3e001b3d779a59c8ccdaf39f871"
     },
     "src/action_state.h": {
       "source": "src/action_state.h",
@@ -469,7 +493,7 @@
     },
     "src/capture_diagnostic.h": {
       "source": "src/capture_diagnostic.h",
-      "sha256": "455783c25b32297b4a44ac4c1cf2f0d27ab0f9181ca6f30620cc4fbb20e1579c"
+      "sha256": "d6f246feb0fec72b43c32b375cfa9e8b1818712d527492a97822da6e1832a785"
     },
     "src/capture_dispatch.h": {
       "source": "src/capture_dispatch.h",
@@ -493,7 +517,7 @@
     },
     "src/core_observation.h": {
       "source": "src/core_observation.h",
-      "sha256": "e4bec1efa1f17c8307df985143814b9915c631e2b2c0df0773e4cd8d3bc1b87f"
+      "sha256": "442d248e65355e11c7ff194ea2a00d8c9642c66ccde3a8f73cdf7983b0afa21a"
     },
     "src/formation_command.h": {
       "source": "src/formation_command.h",
@@ -509,7 +533,7 @@
     },
     "src/guarded_selection.h": {
       "source": "src/guarded_selection.h",
-      "sha256": "712b3d4547395a4f010b0fb8fef94607307875806512a839e1fb2f9a21bd079f"
+      "sha256": "70a99d8526997c9731e34befc2f5c338d14e01ff1ff69d927f3ebbe879ca569b"
     },
     "src/local_pair_state.h": {
       "source": "src/local_pair_state.h",
@@ -525,15 +549,15 @@
     },
     "src/native_calls.h": {
       "source": "src/native_calls.h",
-      "sha256": "0fc3abf113183eacf1d3898789aacd73db76098cfb9368d6e84d366450eb19ae"
+      "sha256": "3cef1b2ab55d03581f6cb7255281b9ba5ed44ce55ce70170dde93ee4921f995c"
     },
     "src/normal_gameplay.c": {
       "source": "src/normal_gameplay.c",
-      "sha256": "a05f02165f771eb3b05008ac762e9ad7effea088e01b2d06677c1b48c77d4b50"
+      "sha256": "9de302d2719cce93ad879483e2e2007679f31cfeb393765f2e2f0d30639ff6a6"
     },
     "src/pair_member.h": {
       "source": "src/pair_member.h",
-      "sha256": "0832d69f04b6ccbee94c1024b99e030adef82b51de6bdf7ee2fb137b50856cdf"
+      "sha256": "552548abda9e6bd73f730c60134ac02ccef185ef4ef2352f54539c581f54a75d"
     },
     "src/pair_owner.h": {
       "source": "src/pair_owner.h",
@@ -557,7 +581,7 @@
     },
     "src/publication_capture.h": {
       "source": "src/publication_capture.h",
-      "sha256": "2c8580c2bf3e71a2936813fbfa3fb915f646a653fc5bf274bac3664c85114056"
+      "sha256": "d06aeb7e2461451def4c7b48125cbce70a96fb38505fccd9426cde8a09cb4dd7"
     },
     "src/publication_state.h": {
       "source": "src/publication_state.h",
@@ -609,11 +633,11 @@
     },
     "src/uss_automatic_controller.h": {
       "source": "src/uss_automatic_controller.h",
-      "sha256": "432457e7482c85874841c689ce95791d82711fd89a1db296793778886e66ad28"
+      "sha256": "8e2a7cf944b5b3518bed1ddb04ce4431b034668b7ee76d8adb1f0fbd8e39a48f"
     },
     "src/uss_automatic_native.h": {
       "source": "src/uss_automatic_native.h",
-      "sha256": "04e0913b3405999be4f8e61512699c124ff70f7ec3e602f295291df143e40a31"
+      "sha256": "ddded9907ca924ddbf678adf39d1f60c5a4f965360313294c4359291b98f5af3"
     },
     "src/uss_binding_capture.h": {
       "source": "src/uss_binding_capture.h",
@@ -641,7 +665,7 @@
     },
     "src/uss_gameplay_application.h": {
       "source": "src/uss_gameplay_application.h",
-      "sha256": "3849d3191afb6ad2f90ddb716e300565d8fa84e05d774e94fb494ddbd9164175"
+      "sha256": "3fa9ccf47e03d2d123d3178cdfb4c634ebe8edaab5f1b6dc26e321c4062fa6c7"
     },
     "src/uss_gameplay_loop.h": {
       "source": "src/uss_gameplay_loop.h",
@@ -677,7 +701,7 @@
     },
     "src/uss_hud_runtime.h": {
       "source": "src/uss_hud_runtime.h",
-      "sha256": "d7fc0944b25cba77349851c567b5d49f594f48bc6f1ca463aa9eae75f9e42490"
+      "sha256": "ae9f6b137cf1e2f6667e8748653a80ece4d61346c4b07e1cfc982523becd95eb"
     },
     "src/uss_hud_windows.h": {
       "source": "src/uss_hud_windows.h",
@@ -771,6 +795,18 @@
       "source": "src/uss_pickup_completion.h",
       "sha256": "acfd71123f756addcb8a7fd60c651c18761eaf42b20718d3b757492321a9833d"
     },
+    "src/uss_ping_desired.h": {
+      "source": "src/uss_ping_desired.h",
+      "sha256": "4d835fbcd2b3e8df2d28a66e2f7f02383fc0d96179ebeb724dafd5fb5523f20c"
+    },
+    "src/uss_ping_filter.h": {
+      "source": "src/uss_ping_filter.h",
+      "sha256": "3d02d8901f8287181b844435c2b2125e7dbd303a384d44102f855d5f72bfa761"
+    },
+    "src/uss_ping_filter_native.h": {
+      "source": "src/uss_ping_filter_native.h",
+      "sha256": "8578ee93ef1725e8f973c645e030c677f2f382f205606f252e040b7612f55501"
+    },
     "src/uss_player_control.h": {
       "source": "src/uss_player_control.h",
       "sha256": "3b073e3e48575de3c7569bc745eb7ff4a5dd4577214124f3aa062348029280a5"
@@ -797,7 +833,7 @@
     },
     "src/uss_recovery_runtime.h": {
       "source": "src/uss_recovery_runtime.h",
-      "sha256": "5f4263c8203faf9f68d703525b8a2b09c0da8da2865ca302b7f65fef14974683"
+      "sha256": "3021c7eb9fdc3e957d37aa731e79eb62c82ca4c6e436568d8cb42ef06fc571fa"
     },
     "src/uss_refill_amount.h": {
       "source": "src/uss_refill_amount.h",
@@ -833,7 +869,7 @@
     },
     "src/uss_refill_target.h": {
       "source": "src/uss_refill_target.h",
-      "sha256": "27705e49e1eb2f55f817c85e78994e46b1efacc058e1d88dd2fb7147fd93f81c"
+      "sha256": "c803ff6fc85f19c8b1d80d8b19e9eeaea968be8baec218e5bcff19d5ee04bba7"
     },
     "src/uss_refill_transaction.h": {
       "source": "src/uss_refill_transaction.h",
@@ -865,15 +901,23 @@
     },
     "src/uss_vpm_menus.h": {
       "source": "src/uss_vpm_menus.h",
-      "sha256": "5afa469ebdce4378e72b7cebf8d04d23d0a431422bf4f51d05975cb7deee8b70"
+      "sha256": "ba1ffc8a26a2dd5f3d2483edf69793097d328cf343ac48b832a7519450b07763"
     },
     "src/uss_vpm_windows.h": {
       "source": "src/uss_vpm_windows.h",
-      "sha256": "79c802728d8aca76a39bfd920605f1bd405b4c6ccfb49221c43e9d826a83638d"
+      "sha256": "ba18cd478986d3576c848c7e3c48be7c0ed93c3fd35792236b520e46b5079ded"
+    },
+    "src/uss_zone_hygiene.h": {
+      "source": "src/uss_zone_hygiene.h",
+      "sha256": "7c10314ec8f828cde76f97a75ed2ac488cfb3b540a440e5e0deb4664a0d74ddc"
+    },
+    "src/utility_lineage.h": {
+      "source": "src/utility_lineage.h",
+      "sha256": "6a15ef5e684a30e751bfca98c16c8c23115c600c82ce22ae2aa53091830522be"
     },
     "src/weapon_policy.h": {
       "source": "src/weapon_policy.h",
-      "sha256": "61c0344dae352761eac52f92a5da5f3bbbcf8e1742777160560ecfe12a71e163"
+      "sha256": "431faa7ab60b5e531fe9926333522556e2c533f29c43dfb1d3ce1504c58b09b6"
     }
   },
   "private_evidence_exported": false,

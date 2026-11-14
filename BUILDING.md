@@ -30,6 +30,6 @@ from main, and creates a draft by default. Review its files and notes before
 publishing. Existing version tags are not moved. Lua history and its old workflow
 are preserved on the legacy branch.
 
-72 offline suites validate owned fixtures and refusal paths; passing them is not
+78 offline suites validate owned fixtures and refusal paths; passing them is not
 in-game or multiplayer proof. Release0.8.0 is based on the gameplay/menu candidate
 accepted during development. Future game builds need a separate compatibility review.

@@ -59,6 +59,16 @@ static void finish_recovery(void)
         assert(recovery.work.phase!=USS_RECOVERY_CANCELLED);}
     assert(recovery.work.phase==USS_RECOVERY_COMPLETE);
 }
+/* Make the game delete an entity: its weapon-lookup entry disappears (as when the Solo Silo is destroyed and its remote is removed). */
+static unsigned char lost_saved[8];static unsigned char* lost_slot;
+static void lose_entity(uint32_t entity)
+{
+    unsigned char* rows=fixture(0x70000800,64);unsigned i;
+    for(i=0;i<8;++i)if(u32(rows+i*8)==entity){lost_slot=rows+i*8;memcpy(lost_saved,lost_slot,8);
+        put32(lost_slot,UINT32_MAX);put32(lost_slot+4,UINT32_MAX);return;}
+    assert(0);
+}
+static void return_entity(void){memcpy(lost_slot,lost_saved,8);}
 static HfTickCallback recovery_callback;static void* recovery_callback_user;
 static UssGameplayLoop recovery_loop;
 static int register_recovery_loop(HfMod* mod,HfTickCallback callback,void* user)
@@ -150,7 +160,85 @@ int USS_RECOVERY_TEST_MAIN(void)
     assert(recovery_update()==USS_CONTROL_WORK && recovery.work.phase==USS_RECOVERY_IDLE && !recovery_effects);
     put32(fixture(0x70000700,240)+96+4,0);replacement_now+=25;
     assert(recovery_update()==USS_CONTROL_WORK && recovery.work.phase==USS_RECOVERY_ATTACH);finish_recovery();
-    puts("USS recovery:16host/joiner/class/selection/drop-consumption scenes -> concrete OWN restore/lone send/selection/clear; death stored-only, waits, unknown/failure no retry PASS");return 0;
+    /* The STORED member vanishes while the real one stays (Solo Silo destroyed, remote deleted by the game): after two clean absences
+     * at least 400 ms apart the pair is cleared with no native effect; the real member stays in slot 2 with its selection. */
+    for(role=HF_SESSION_HOST;role<=HF_SESSION_JOINER;++role)for(utility=0;utility<=1;++utility){
+        uint32_t stored=utility?102u:103u,real=utility?103u:102u;
+        recovery_scene(utility,1,role);lose_entity(stored);
+        assert(recovery_update()==USS_CONTROL_WORK && automatic_runtime.life.owner.pair_present && recovery.work.phase==USS_RECOVERY_IDLE);
+        replacement_now+=100;assert(recovery_update()==USS_CONTROL_WORK && automatic_runtime.life.owner.pair_present);
+        replacement_now+=300;assert(recovery_update()==USS_CONTROL_WORK && !automatic_runtime.life.owner.pair_present);
+        assert(automatic_runtime.life.phase==USS_LIFE_EMPTY && !automatic_runtime.publication.record_present);
+        assert(!recovery_effects && !recovery_sends && !recovery_drops && recovery.work.phase==USS_RECOVERY_IDLE);
+        assert(!strcmp(recovery.reason,"STORED_MEMBER_LOST_PAIR_CLEARED"));
+        {char expected[96];snprintf(expected,sizeof(expected),"USS stored member %u no longer exists; pair cleared, real member %u",(unsigned)stored,(unsigned)real);
+         assert(strstr(last_log,expected));}
+        assert(u32(fixture(0x70000300,48)+8)==real && u32(fixture(0x70000300,48)+28)==1);
+        before=recovery_effects;replacement_now+=25;assert(recovery_update()==USS_CONTROL_IDLE && recovery_effects==before);
+    }
+    /* A blocked policy (paused/input) declines with a named reason, once per reason, and never clears. */
+    recovery_scene(0,1,HF_SESSION_HOST);lose_entity(103);automatic_runtime.policy.paused=1;logs=0;
+    for(before=0;before<5;++before){replacement_now+=300;(void)recovery_update();}
+    assert(automatic_runtime.life.owner.pair_present && logs==1 && strstr(last_log,"declined: POLICY_NOT_READY_PAUSED_OR_INPUT"));
+    automatic_runtime.policy.paused=0;
+    replacement_now+=300;assert(recovery_update()==USS_CONTROL_WORK && automatic_runtime.life.owner.pair_present); /* first sighting again */
+    replacement_now+=500;assert(recovery_update()==USS_CONTROL_WORK && !automatic_runtime.life.owner.pair_present);
+    /* A transient absence never clears: the sighting is forgotten when the member is healthy again, and a new loss starts over. */
+    recovery_scene(0,1,HF_SESSION_HOST);lose_entity(103);assert(recovery_update()==USS_CONTROL_WORK);
+    return_entity();replacement_now+=500;assert(recovery_update()==USS_CONTROL_IDLE && automatic_runtime.life.owner.pair_present && !recovery.lost_count);
+    lose_entity(103);replacement_now+=500;assert(recovery_update()==USS_CONTROL_WORK && automatic_runtime.life.owner.pair_present);
+    replacement_now+=500;assert(recovery_update()==USS_CONTROL_WORK && !automatic_runtime.life.owner.pair_present);
+    /* The stored member reappears while the ordinary observation is still failing: the earlier sighting is forgotten, so a later
+     * loss needs its own full wait. */
+    recovery_scene(0,1,HF_SESSION_HOST);lose_entity(103);assert(recovery_update()==USS_CONTROL_WORK);
+    return_entity();replacement_now+=100;reads=0;fail_at=1;(void)recovery_update();fail_at=0;
+    assert(automatic_runtime.life.owner.pair_present && recovery.lost_count==0);
+    lose_entity(103);replacement_now+=500;assert(recovery_update()==USS_CONTROL_WORK && automatic_runtime.life.owner.pair_present);
+    replacement_now+=500;assert(recovery_update()==USS_CONTROL_WORK && !automatic_runtime.life.owner.pair_present);
+    /* An unknown read is never absence: whichever read of the confirming pass fails, nothing is cleared and nothing is called. */
+    {unsigned n,total,core_reads;
+     /* One successful confirming pass = the ordinary Core observation (which fails here, the stored member being gone) plus the
+      * recovery observation's own reads. Fail each recovery read in turn: nothing may be cleared or called. */
+     recovery_scene(0,1,HF_SESSION_HOST);lose_entity(103);assert(recovery_update()==USS_CONTROL_WORK);
+     replacement_now+=500;
+     {UssCorePlatform platform={0};UssCoreFlags flags=uss_lifecycle_flags(&automatic_runtime.life,&core_flags);
+      platform.thread_id=core_thread;reads=0;(void)uss_core_observe(&fake,MOD,&automatic_runtime.life.owner,&flags,&platform,NULL);core_reads=reads;}
+     reads=0;assert(recovery_update()==USS_CONTROL_WORK && !automatic_runtime.life.owner.pair_present);total=reads;
+     assert(core_reads>0 && total>core_reads+10 && total<2000);
+     for(n=core_reads+1;n<=total;++n){
+        recovery_scene(0,1,HF_SESSION_HOST);lose_entity(103);assert(recovery_update()==USS_CONTROL_WORK);
+        replacement_now+=500;reads=0;fail_at=n;(void)recovery_update();fail_at=0;
+        if(!(automatic_runtime.life.owner.pair_present && recovery_effects==0 && strcmp(recovery.reason,"STORED_MEMBER_LOST_PAIR_CLEARED")))
+            fprintf(stderr,"failing read %u of %u (core %u): pair=%u effects=%u reason=%s\n",n,total,core_reads,(unsigned)automatic_runtime.life.owner.pair_present,recovery_effects,recovery.reason);
+        assert(automatic_runtime.life.owner.pair_present && recovery_effects==0 && strcmp(recovery.reason,"STORED_MEMBER_LOST_PAIR_CLEARED"));
+     }}
+    /* Guards of the clean-absence rule. (a) The stored member is PRESENT but the ordinary observation keeps failing: never cleared. */
+    recovery_scene(0,1,HF_SESSION_HOST);
+    for(before=0;before<8;++before){replacement_now+=100;reads=0;fail_at=1;(void)recovery_update();fail_at=0;}
+    assert(automatic_runtime.life.owner.pair_present && strcmp(recovery.reason,"STORED_MEMBER_LOST_PAIR_CLEARED"));
+    /* (b) the real member is no longer in slot 2, (c) the real member is not carried by the avatar: another path owns those. */
+    recovery_scene(0,1,HF_SESSION_HOST);lose_entity(103);put32(fixture(0x70000300,48)+8,0);
+    for(before=0;before<6;++before){replacement_now+=100;(void)recovery_update();}
+    assert(automatic_runtime.life.owner.pair_present && strcmp(recovery.reason,"STORED_MEMBER_LOST_PAIR_CLEARED"));
+    recovery_scene(0,1,HF_SESSION_HOST);lose_entity(103);put32(fixture(0x70000700,240)+48+4,0);
+    for(before=0;before<6;++before){replacement_now+=100;(void)recovery_update();}
+    assert(automatic_runtime.life.owner.pair_present && strcmp(recovery.reason,"STORED_MEMBER_LOST_PAIR_CLEARED"));
+    /* Not this path: the real member is gone too, death context, an active replacement, or a pair that is not formed. */
+    recovery_scene(0,1,HF_SESSION_HOST);lose_entity(103);empty_support(1,1);
+    for(before=0;before<6;++before){replacement_now+=100;(void)recovery_update();}
+    assert(automatic_runtime.life.owner.pair_present && strcmp(recovery.reason,"STORED_MEMBER_LOST_PAIR_CLEARED"));
+    recovery_scene(0,1,HF_SESSION_HOST);lose_entity(103);memset(fixture(0x70000300,48),0,8);
+    for(before=0;before<6;++before){replacement_now+=100;(void)recovery_update();}
+    assert(strcmp(recovery.reason,"STORED_MEMBER_LOST_PAIR_CLEARED"));
+    recovery_scene(0,1,HF_SESSION_HOST);lose_entity(103);automatic_controller.replacement.phase=USS_REPLACE_ACTIVE;
+    for(before=0;before<4;++before){replacement_now+=300;(void)recovery_update();}
+    assert(automatic_runtime.life.owner.pair_present && strcmp(recovery.reason,"STORED_MEMBER_LOST_PAIR_CLEARED"));
+    automatic_controller.replacement.phase=USS_REPLACE_IDLE;
+    recovery_scene(0,1,HF_SESSION_HOST);lose_entity(103);automatic_runtime.life.phase=USS_LIFE_REPLACING;
+    for(before=0;before<4;++before){replacement_now+=300;(void)recovery_update();}
+    assert(automatic_runtime.life.owner.pair_present && strcmp(recovery.reason,"STORED_MEMBER_LOST_PAIR_CLEARED"));
+    automatic_runtime.life.phase=USS_LIFE_FORMED;
+    puts("USS recovery: stored-member loss clears the pair with no native effect (clean absence twice, 400 ms, real member kept; unknown/transient/death/replacement refused); 16host/joiner/class/selection/drop-consumption scenes -> concrete OWN restore/lone send/selection/clear; death stored-only, waits, unknown/failure no retry PASS");return 0;
 }
 
 

@@ -5,6 +5,7 @@
 #include "pair_owner.h"
 #include "publication_capture.h"
 #include "pair_member.h"
+#include "utility_lineage.h"
 
 typedef struct UssCoreFlags {
     unsigned known,eligible,formed,formation_pending,disabled,suspended,paused,down,input;
@@ -152,6 +153,7 @@ static UssCoreObservation core_observe_extended(const HfApi* api,HfMod* mod,cons
         candidate.valid=1;goto accepted;
     }
     if(!flags || !flags->known)goto done;
+    uss_support_lineage_scan_once(api,mod); /* once per session, only after a mission has begun */
     candidate.flags=*flags;candidate.mission=1;
     memory.stage="CORE_INVENTORY";
     if(!inventory_sample(&memory,&inventory) ||
@@ -172,7 +174,9 @@ static UssCoreObservation core_observe_extended(const HfApi* api,HfMod* mod,cons
         if(candidate.pair_matched && pair_member_equal(&names.members[i],&owner->utility))named_before[i]=utility_before;
         else if(candidate.pair_matched && pair_member_equal(&names.members[i],&owner->ordinary))named_before[i]=ordinary_before;
         else if(!member_fields(&memory,before.game,&inventory,names.members[i].entity,names.members[i].identity,&named_before[i]))goto done;
-        if(named_before[i].classification!=uss_classify_support(names.members[i].identity,2)){memory.failure="CANDIDATE_CLASS";goto done;}
+        if(named_before[i].classification!=uss_classify_support(names.members[i].identity,2)){
+            memory.diag_native_kind=named_before[i].native_kind;memory.diag_effective_kind=named_before[i].kind;
+            memory.failure="CANDIDATE_CLASS";goto done;}
     }
     if(!primary_fields(&memory,before.game,&inventory,&primary_after) || memcmp(&primary_before,&primary_after,sizeof(primary_before)))goto done;
     if(candidate.pair_matched &&
@@ -200,6 +204,11 @@ accepted:
         owner->context_generation!=candidate.expected_context || owner->pair_generation!=candidate.expected_pair ||
         owner->guard_generation!=candidate.expected_guard)goto done;
     result=candidate;
+    /* Every coherence, re-read and lifetime check above passed: only now may a slot-residency proof become lasting,
+     * and the current pair's members are protected from replacement in the proof table. */
+    uss_support_proof_commit(&memory);
+    if(owner->pair_present)uss_support_proof_protect(owner->utility.identity,owner->ordinary.identity);
+    else uss_support_proof_protect(NULL,NULL);
     if(named){named->current=result;if(result.mission){named->names=names;named->valid=1;
         for(i=0;i<names.count;++i)named->members[i]=named_after[i];}}
 done:

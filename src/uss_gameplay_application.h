@@ -8,6 +8,8 @@
 #include "uss_automatic_native.h"
 #include "uss_recovery_runtime.h"
 #include "uss_hud_runtime.h"
+#include "uss_ping_filter_native.h"
+#include "uss_ping_desired.h"
 
 typedef struct UssGameplayEnvironment {
     UssCapturePlatform platform;void* user;uint64_t (*clock_ms)(void*);
@@ -18,12 +20,16 @@ typedef struct UssGameplayEnvironment {
     int (*drop_stored)(void*,uintptr_t,uintptr_t,uint32_t,uint32_t);
     UssRefillObserver refill_notice; /* Same optional positive-gain observer as Lua. */
     UssHudPresentationInvoke hud_presentation; /* Optional, isolated cosmetic binding. */
+    UssZoneCloseInvoke zone_close; /* Optional: close a carried pair member's open ground pickup zone (uss_zone_hygiene.h). */
+    UssPingInvoke ping_invoke; /* Optional: the game's filter command, enabling stored-weapon ping suppression (uss_ping_filter.h). */
     void (*menu_frame)(void*,float,UssSettingsState*,unsigned); /* Session UI; independently validates its native host. */
 } UssGameplayEnvironment;
 typedef struct UssGameplayApplication {
     UssGameplayLoop loop;UssFormationRuntime formation;UssFormationNative native;
     UssAutomaticController automatic;UssAutomaticNative replacement;UssPlayerControl player;
     UssHudRuntime hud;UssRecoveryRuntime recovery;UssPlayerInputSdk input;UssSettingsState settings;UssGameplayEnvironment environment;
+    /* Stored-weapon ping suppression; inert unless the environment supplies ping_invoke. */
+    struct { UssPingNative native;UssPingFilter filter;uint64_t next_ms;unsigned enabled; } ping;
     unsigned attempted,initialized;const char* reason;
 } UssGameplayApplication;
 static void application_menu_frame(void* user,float dt)
@@ -62,6 +68,7 @@ static int application_policy(void* user,UssCoreFlags* flags)
                 app->environment.replacement_effect,app->environment.effect_user)){
             app->reason="APPLICATION_INITIALIZATION_FAILED";uss_gameplay_loop_stop(&app->loop);return 0;
         }
+        uss_automatic_native_enable_zone_hygiene(&app->replacement,app->environment.zone_close,app->environment.effect_user);
         app->initialized=1;app->reason="NORMAL_GAMEPLAY_INITIALIZED";return 1;
     }
     return uss_player_sdk_policy(&app->input,flags);
@@ -74,6 +81,7 @@ static int application_retire_actor(UssGameplayApplication* app)
     if(runtime->busy || runtime->publication.busy)return 0;
     memset(&runtime->work,0,sizeof(runtime->work));uss_local_pair_invalidate(&runtime->local);
     uss_hud_runtime_retire(&app->hud);
+    uss_ping_filter_forget(&app->ping.filter);app->ping.next_ms=0; /* the old actor's helpers no longer exist */
     memset(&runtime->life.plan,0,sizeof(runtime->life.plan));runtime->life.phase=USS_LIFE_EMPTY;
     pickup_clear(&runtime->history);uss_publication_reset(&runtime->publication);
     memset(&app->recovery.work,0,sizeof(app->recovery.work));app->recovery.real=0;app->recovery.watched_pair=0;app->recovery.waiting=0;
@@ -81,11 +89,25 @@ static int application_retire_actor(UssGameplayApplication* app)
     memset(&app->player.pending,0,sizeof(app->player.pending));
     if(!uss_automatic_native_init(&app->replacement,&app->automatic,&app->native,uss_player_sdk_pickup,&app->input,
         app->environment.replacement_effect,app->environment.effect_user))return 0;
+    uss_automatic_native_enable_zone_hygiene(&app->replacement,app->environment.zone_close,app->environment.effect_user);
     app->loop.handling_paused=0;app->reason="ACTOR_WORK_RETIRED";return 1;
+}
+/* Drive the ping filter from the fresh observation every tick, including invalid ones (a restore must still be attempted).
+ * At most one pass per 50 ms. Pickup-prompt handling is separate. */
+static void application_ping_sync(UssGameplayApplication* app,const UssCoreObservation* current,uint64_t now)
+{
+    UssPingDesired desired;uintptr_t owner_token;
+    if(!app->ping.enabled)return;
+    if(app->ping.next_ms && now<app->ping.next_ms && app->ping.next_ms-now<=50u)return; /* within 50 ms of the last pass */
+    app->ping.next_ms=now+50u;
+    (void)uss_ping_desired_from(&app->formation.life,current,app->loop.handling_paused,&desired);
+    owner_token=current->valid && current->mission?current->context.local.owner:app->ping.filter.old.owner;
+    (void)uss_ping_filter_step(&app->ping.filter,&desired,owner_token,now);
 }
 static unsigned application_lifecycle(void* user,const UssCoreObservation* current,uint64_t now)
 {
     UssGameplayApplication* app=user;UssPairOwner* owner=&app->formation.life.owner;
+    if(app->initialized)application_ping_sync(app,current,now);
     if(!app->initialized || !current->valid)return USS_CONTROL_IDLE;
     if(owner->mission && (!current->mission || (owner->context_valid &&
         !pair_owner_same_actor(&owner->context,&current->context)))){
@@ -169,6 +191,12 @@ static inline int uss_gameplay_application_register(UssGameplayApplication* app,
     app->recovery.native.reader.platform=app->input.platform;app->recovery.native.reader.policy=&app->formation.policy;
     app->recovery.native.input_user=app;app->recovery.native.input_clear=application_recovery_input;
     app->recovery.native.drop_user=environment->effect_user;app->recovery.native.drop=environment->drop_stored;
+    if(environment->ping_invoke){
+        UssPingFilterIo ping_io;
+        app->ping.native.api=api;app->ping.native.mod=mod;app->ping.native.invoke=environment->ping_invoke;
+        app->ping.native.invoke_user=environment->effect_user;
+        ping_io=uss_ping_native_io(&app->ping.native);uss_ping_filter_init(&app->ping.filter,&ping_io);app->ping.enabled=1;
+    }
     io.frame=application_menu_frame;
     io.recover=application_recovery;io.lifecycle=application_lifecycle;io.refilled=application_refilled;
     io.user=app;io.clock_ms=application_clock;io.thread_id=application_thread;io.policy=application_policy;io.control=application_control;

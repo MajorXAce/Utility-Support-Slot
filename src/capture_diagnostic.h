@@ -47,7 +47,7 @@ static int capture_identity_member(Reader* reader,const Inventory* owner,uintptr
     uint32_t entity,unsigned char descriptor[24],uint32_t* parent)
 {
     uint32_t kind,index;unsigned char header[72];uintptr_t rows;
-    if(!weapon(reader,base+0x3326DC0,owner->roots[4],entity,descriptor,&kind) || kind!=2 ||
+    if(!weapon(reader,base+0x3326DC0,owner->roots[4],entity,descriptor,&kind) || weapon_support_kind(reader,descriptor,kind)!=2 || reader->failure ||
         !get(reader,owner->roots[4],header,72) ||
         !lookup(reader,owner->roots[4]+0x20,entity,&index) || index>=u32(header+12) || index>=16384)return 0;
     rows=ptr_value(header+64);

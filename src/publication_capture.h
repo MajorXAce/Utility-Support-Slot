@@ -120,7 +120,7 @@ static int capture_members_internal(UssCaptureReader* reader,const UssCaptureInp
             !capture_bytes(reader,unit_rows+(uintptr_t)index*48,row,20,0) ||
             memcmp(descriptor,unit_descriptor,8) || u32(unit_descriptor+8)!=roles[i] ||
             u32(row+4)!=owner->avatar || !(descriptor[20]&1))return 0;
-        if(i && (u32(row+12)!=2 || memcmp(descriptor,roles[i]==input->utility?input->utility_identity:input->ordinary_identity,8)))return 0;
+        if(i && (weapon_support_kind(&reader->memory,unit_descriptor,u32(row+12))!=2 || reader->memory.failure || memcmp(descriptor,roles[i]==input->utility?input->utility_identity:input->ordinary_identity,8)))return 0;
         /* Missing component is required. A read/limit failure is never absence. */
         if(capture_lookup(reader,component+0x20,roles[i],&absent)!=0 || reader->memory.failure ||
             capture_lookup(reader,relationships+0x18,roles[i],&relation)!=1 || relation>1048576 ||

@@ -19,6 +19,13 @@ typedef struct Reader {
     unsigned final_valid, final_reasons, difference_mask;
     uint32_t first_unit, second_unit, first_avatar, second_avatar;
     uint32_t descriptor_u12[2], descriptor_u16[2], descriptor_u20[2];
+    /* Log-only: native row kind and the kind USS accepted for a refused candidate, and how a kind-0 weapon was judged. */
+    uint32_t diag_native_kind, diag_effective_kind;
+    const char* diag_fallback;
+    /* Support proof seen in THIS observation only. It becomes lasting only if the whole observation is accepted
+     * (uss_support_proof_commit); a failed or incoherent observation drops it with the reader. */
+    unsigned char pending_proof[2][8];
+    unsigned pending_proof_count;
 } Reader;
 typedef struct Inventory {
     uintptr_t roots[5];
@@ -26,7 +33,8 @@ typedef struct Inventory {
     unsigned char avatar_header[24], row[48];
     uint32_t local_unit, avatar, slots[4], active_selector, held;
     unsigned char identities[5][24];
-    uint32_t observed_kinds[5]; /* Unclassified observations, never gameplay approval. */
+    uint32_t observed_kinds[5]; /* Effective categories; support-only fallback is read-only. */
+    uint32_t native_kinds[5]; /* Original runtime row values, retained separately. */
 } Inventory;
 
 static uint32_t u32(const void* p) { uint32_t n; memcpy(&n,p,4); return n; }
@@ -112,6 +120,111 @@ static int resolve(Reader* r, uintptr_t base, size_t size, uintptr_t globals[5])
     }
     return 1;
 }
+/* Some HellForge weapon clones (for example Compendium's EAT-77) report runtime kind 0 although the game places them
+ * in the native support slot. Live log: component_record returned no usable record for that clone (NO_RECORD), i.e. the SDK
+ * did not expose one; that is NOT proof that no loadout record physically exists. So the proof is slot residency: when the
+ * game itself puts a kind-0 weapon in the support slot, its identity (the 8-byte resource id, the same for every copy of
+ * that weapon) is remembered as support. A pair member that later leaves the slot keeps that identity, so it is still
+ * recognised. Nothing here writes to the game; native kind 2 never uses this table, and kinds 1, 3 and other non-zero
+ * values are never promoted.
+ * Rules that keep the table honest:
+ *  - Seen-in-slot identities are PENDING inside the Reader. They become lasting only when the whole observation is accepted
+ *    (uss_support_proof_commit, called by Core after every coherence/re-read check passed). A failed or incoherent
+ *    observation leaves nothing behind.
+ *  - Replacement is least-recently-used, and every successful lookup refreshes the entry, so a stored pair member that is
+ *    read each observation is never the one evicted. The current pair members' identities are additionally PROTECTED
+ *    (uss_support_proof_protect) and are never evicted; if no unprotected entry exists a new identity is simply not
+ *    recorded (fail closed). */
+#define USS_SUPPORT_PROOF_CAPACITY 8
+typedef struct UssSupportProof {
+    unsigned char identity[8];
+    uint32_t stamp;           /* last use; larger = more recent */
+    unsigned char protect;    /* 1 while the identity belongs to the current pair owner */
+} UssSupportProof;
+static UssSupportProof uss_support_proof[USS_SUPPORT_PROOF_CAPACITY];
+static unsigned uss_support_proof_count;
+static uint32_t uss_support_proof_clock;
+static inline void uss_support_proof_reset(void)
+{
+    memset(uss_support_proof,0,sizeof uss_support_proof);
+    uss_support_proof_count=0;uss_support_proof_clock=0;
+}
+static inline int support_proof_index(const unsigned char identity[8])
+{
+    unsigned i;
+    for(i=0;i<uss_support_proof_count;++i)if(!memcmp(uss_support_proof[i].identity,identity,8))return (int)i;
+    return -1;
+}
+static inline int support_proof_has(const unsigned char identity[8]){return support_proof_index(identity)>=0;}
+/* A successful lookup refreshes recency (least-recently-used replacement). */
+static inline int support_proof_use(const unsigned char identity[8])
+{
+    int i=support_proof_index(identity);
+    if(i<0)return 0;
+    uss_support_proof[i].stamp=++uss_support_proof_clock;
+    return 1;
+}
+/* 1 when the identity is now recorded (or already was); 0 for an empty identity or when every slot is protected. */
+static inline int support_proof_note(const unsigned char identity[8])
+{
+    static const unsigned char zero[8]={0};
+    unsigned i,victim=0;int found=0;
+    if(!identity || !memcmp(identity,zero,8))return 0;
+    if(support_proof_use(identity))return 1;
+    if(uss_support_proof_count<USS_SUPPORT_PROOF_CAPACITY){
+        victim=uss_support_proof_count++;
+    }else{
+        for(i=0;i<USS_SUPPORT_PROOF_CAPACITY;++i){
+            if(uss_support_proof[i].protect)continue;
+            if(!found || uss_support_proof[i].stamp<uss_support_proof[victim].stamp){victim=i;found=1;}
+        }
+        if(!found)return 0; /* fail closed: never evict a protected (active pair) identity */
+    }
+    memcpy(uss_support_proof[victim].identity,identity,8);
+    uss_support_proof[victim].stamp=++uss_support_proof_clock;
+    uss_support_proof[victim].protect=0;
+    return 1;
+}
+/* Protect exactly the given identities (the current pair's members); pass NULL for none. */
+static inline void uss_support_proof_protect(const unsigned char a[8],const unsigned char b[8])
+{
+    unsigned i;
+    for(i=0;i<uss_support_proof_count;++i)
+        uss_support_proof[i].protect=(unsigned char)((a && !memcmp(uss_support_proof[i].identity,a,8)) ||
+                                                      (b && !memcmp(uss_support_proof[i].identity,b,8)));
+}
+/* Remember, for this observation only, that the game placed this kind-0 weapon in the support slot. */
+static inline void support_proof_pending(Reader* r,const unsigned char identity[8])
+{
+    unsigned i;
+    if(!r || !identity)return;
+    for(i=0;i<r->pending_proof_count;++i)if(!memcmp(r->pending_proof[i],identity,8))return;
+    if(r->pending_proof_count<sizeof(r->pending_proof)/sizeof(r->pending_proof[0]))
+        memcpy(r->pending_proof[r->pending_proof_count++],identity,8);
+}
+/* Call only after the observation as a whole was accepted. */
+static inline void uss_support_proof_commit(Reader* r)
+{
+    unsigned i;
+    if(!r)return;
+    for(i=0;i<r->pending_proof_count;++i)(void)support_proof_note(r->pending_proof[i]);
+    r->pending_proof_count=0;
+}
+static inline int support_proof_pending_has(const Reader* r,const unsigned char identity[8])
+{
+    unsigned i;
+    if(!r)return 0;
+    for(i=0;i<r->pending_proof_count;++i)if(!memcmp(r->pending_proof[i],identity,8))return 1;
+    return 0;
+}
+static uint32_t weapon_support_kind(Reader* r,const unsigned char descriptor[24],uint32_t native_kind)
+{
+    if(native_kind!=0 || !descriptor)return native_kind;
+    if(support_proof_use(descriptor)){if(r)r->diag_fallback="IDENTITY_PROVEN";return 2;}
+    if(support_proof_pending_has(r,descriptor)){r->diag_fallback="SLOT_PROVEN_PENDING";return 2;}
+    if(r)r->diag_fallback="UNPROVEN";
+    return native_kind;
+}
 static int weapon(Reader* r, uintptr_t global, uintptr_t manager, uint32_t id, unsigned char out[24], uint32_t* kind)
 {
     unsigned char h[72],again[72],row[20],descriptor[24];
@@ -174,6 +287,13 @@ static int graph(Reader* r, const uintptr_t globals[5], Inventory* out)
     for(k=0;k<5;++k) {
         r->slot=(int)k; r->predicate_valid=0;
         if(!weapon(r,globals[4],out->roots[4],k<4?out->slots[k]:out->held,out->identities[k],&out->observed_kinds[k])) return 0;
+        out->native_kinds[k]=out->observed_kinds[k];
+        if(valid_id(k<4?out->slots[k]:out->held) && (k==2 || (k==4 && out->held==out->slots[2]))) {
+            /* This weapon is the occupant of the native support slot (or is held from it): the proof point. */
+            if(out->native_kinds[k]==0)support_proof_pending(r,out->identities[k]);
+            out->observed_kinds[k]=weapon_support_kind(r,out->identities[k],out->native_kinds[k]);
+            if(r->failure)return 0;
+        }
     }
     return 1;
 }
@@ -193,7 +313,8 @@ static int final_context(Reader* r, const Inventory* first, const Inventory* sec
     if(memcmp(first->slots,second->slots,sizeof(first->slots))) differences|=16;
     if(first->held!=second->held) differences|=32;
     if(memcmp(first->identities,second->identities,sizeof(first->identities))) differences|=64;
-    if(memcmp(first->observed_kinds,second->observed_kinds,sizeof(first->observed_kinds))) differences|=128;
+    if(memcmp(first->observed_kinds,second->observed_kinds,sizeof(first->observed_kinds)) ||
+       memcmp(first->native_kinds,second->native_kinds,sizeof(first->native_kinds))) differences|=128;
     if(first->avatar!=second->avatar) differences|=256;
     if(first->row_address!=second->row_address) differences|=512;
     /* Keep the original whole-sample equality guard, including every copied field. */

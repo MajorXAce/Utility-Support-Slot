@@ -10,6 +10,7 @@ typedef enum UssMemberStatus {
 typedef struct UssMemberEvidence {
     UssMemberStatus status;
     uint32_t entity, parent, kind, zone, tail;
+    uint32_t native_kind; /* Preserve the runtime value; kind is the effective support category. */
     unsigned char gate;
     unsigned parent_matches, interaction_admissible;
     UssSupportClass classification;
@@ -44,7 +45,9 @@ static int member_fields(Reader* reader,uintptr_t base,const Inventory* context,
         u32(result->descriptor+8)!=entity || memcmp(result->descriptor,expected,8)) return 0;
     result->weapon_row=unit_rows+(uintptr_t)result->weapon_index*48;
     if (!get(reader,result->weapon_row,row,20)) return 0;
-    result->entity=entity; result->parent=u32(row+4); result->kind=u32(row+12);
+    result->entity=entity; result->parent=u32(row+4); result->native_kind=u32(row+12);
+    result->kind=weapon_support_kind(reader,result->descriptor,result->native_kind);
+    if(reader->failure)return 0;
     result->classification=uss_classify_support(result->descriptor,result->kind);
     result->parent_matches=result->parent==context->avatar;
 

@@ -262,6 +262,7 @@ HF_MOD_EXPORT int hellforge_mod_init(const HfApi* api,HfMod* mod)
     environment.clock_ms=uss_gameplay_windows_clock;environment.foreground=normal_foreground;environment.dedicated=normal_dedicated;
     environment.formation_effect=formation_native_invoke;environment.replacement_effect=replacement_runtime_invoke;
     environment.drop_stored=uss_recovery_drop_invoke;environment.hud_presentation=uss_hud_presentation_invoke;
+    environment.zone_close=uss_zone_close_invoke;environment.ping_invoke=uss_ping_native_invoke;
     environment.menu_frame=normal_menu_frame;
     if(!uss_gameplay_application_register(&normal.app,api,mod,&environment,loaded==USS_SETTINGS_LOADED?&saved:NULL)){
         /* Registration may have retained our callback even on reported failure.

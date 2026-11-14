@@ -191,9 +191,11 @@ static inline int hud_popup_inventory_same(const Inventory* before,const Invento
         unsigned slot=current->active_selector;
         if(slot<1 || slot>3 || current->held!=current->slots[slot-1] ||
             memcmp(current->identities[4],current->identities[slot-1],24) ||
-            current->observed_kinds[4]!=current->observed_kinds[slot-1])return 0;
+            current->observed_kinds[4]!=current->observed_kinds[slot-1] ||
+            current->native_kinds[4]!=current->native_kinds[slot-1])return 0;
         settled.held=current->held;memcpy(settled.identities[4],current->identities[4],24);
         settled.observed_kinds[4]=current->observed_kinds[4];
+        settled.native_kinds[4]=current->native_kinds[4];
     }
     return !memcmp(&settled,current,sizeof(settled));
 }

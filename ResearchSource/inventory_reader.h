@@ -22,6 +22,16 @@ typedef struct Reader {
     /* Log-only: native row kind and the kind USS accepted for a refused candidate, and how a kind-0 weapon was judged. */
     uint32_t diag_native_kind, diag_effective_kind;
     const char* diag_fallback;
+    /* Log-only refusal detail. Nothing here is read by a decision, and filling it adds no game read.
+     * `detail` is a short sub-reason for a refusal whose `failure` is a broader label (for example CORE_SCOPE).
+     * The pin_* fields describe a refused game.dll signature: `pin_site` is its index 0..4 (-1 when the module itself was
+     * unusable), `pin_rva` its offset from the game.dll base (an address offset, never an entity id), `pin_byte` the first
+     * signature byte that differed (-1 when the refusal was not a byte difference), `pin_actual` / `pin_expected` that byte's
+     * values, and `pin_global_rva` / `pin_expected_global_rva` the global the decoded RIP-relative operand pointed at versus the
+     * one this build requires. `pin_cause` names the check that refused: MODULE_BASE, MODULE_SIZE, READ, BYTE or GLOBAL. */
+    const char* detail;
+    unsigned pin_valid;int pin_site,pin_byte;uint32_t pin_rva,pin_global_rva,pin_expected_global_rva;unsigned pin_actual,pin_expected;
+    const char* pin_cause;
     /* Support proof seen in THIS observation only. It becomes lasting only if the whole observation is accepted
      * (uss_support_proof_commit); a failed or incoherent observation drops it with the reader. */
     unsigned char pending_proof[2][8];
@@ -93,6 +103,12 @@ static unsigned hex_digit(char c) { return (unsigned)(c<='9'?c-'0':c-'a'+10); }
 static int valid_id(uint32_t id) { return id && id!=UINT32_MAX; }
 
 /* No scanner fallback. Mismatch on this exact build refuses the whole attempt. */
+/* Retain the published 0.8.1 signatures exactly. Diagnostics record rejection details without relaxing the pin. */
+/* Record which resolver signature refused and why (log-only). `site` -1 means the module itself was unusable. */
+static void pin_refusal(Reader* r,int site,uint32_t rva,const char* cause)
+{
+    r->pin_valid=1;r->pin_site=site;r->pin_rva=rva;r->pin_byte=-1;r->pin_cause=cause;
+}
 static int resolve(Reader* r, uintptr_t base, size_t size, uintptr_t globals[5])
 {
     static const uint32_t rvas[]={0x518C2A,0x3A4BDE,0x3A9E00,0x4AABCA,0xC30B8};
@@ -104,18 +120,29 @@ static int resolve(Reader* r, uintptr_t base, size_t size, uintptr_t globals[5])
         "4c8b15????????7517b8ffffffff8bc84869c1d0010000490342604883c408c3",
         "488b3d????????4c89742438448b4f28448b5f30440fafd8458d71ff4585c90f"};
     unsigned i,j;
-    if(size<0x3326DC8 || size>0x20000000 || !address_ok(base,size)) return 0;
+    if(size<0x3326DC8 || size>0x20000000 || !address_ok(base,size)) { pin_refusal(r,-1,0,"MODULE_SIZE"); return 0; }
     for(i=0;i<5;++i) {
         unsigned char bytes[32];
         size_t length=strlen(patterns[i])/2;
         int32_t displacement;
-        if(length>sizeof(bytes) || !get(r,base+rvas[i],bytes,length)) return 0;
+        int64_t resolved;
+        if(length>sizeof(bytes) || !get(r,base+rvas[i],bytes,length)) {
+            pin_refusal(r,(int)i,rvas[i],"READ"); r->detail=r->failure; /* keep the precise read failure (bounds or status) */
+            return 0;
+        }
         for(j=0;j<length;++j) if(patterns[i][j*2]!='?') {
             unsigned expected=16*hex_digit(patterns[i][j*2])+hex_digit(patterns[i][j*2+1]);
-            if(bytes[j]!=expected) return 0;
+            if(bytes[j]!=expected) {
+                pin_refusal(r,(int)i,rvas[i],"BYTE"); r->pin_byte=(int)j; r->pin_actual=bytes[j]; r->pin_expected=expected;
+                return 0;
+            }
         }
         memcpy(&displacement,bytes+3,4);
-        if((int64_t)rvas[i]+7+displacement!=targets[i]) return 0;
+        resolved=(int64_t)rvas[i]+7+displacement; /* RVA the RIP-relative operand points at (7 = instruction length) */
+        if(resolved!=targets[i]) {
+            pin_refusal(r,(int)i,rvas[i],"GLOBAL"); r->pin_global_rva=(uint32_t)resolved; r->pin_expected_global_rva=targets[i];
+            return 0;
+        }
         globals[i]=base+targets[i];
     }
     return 1;
@@ -346,7 +373,9 @@ static int inventory_sample(Reader* r, Inventory* output)
     Inventory first,second;
     base=r->api->module_base("game.dll",&size);
     r->slot=-1; r->stage="MODULE_PINS";
-    if(!base || !resolve(r,base,size,globals)) { r->failure="MODULE_PINS"; return 0; }
+    if(!base) { pin_refusal(r,-1,0,"MODULE_BASE"); r->failure="MODULE_PINS"; return 0; }
+    /* The broad label stays MODULE_PINS for compatibility; the precise cause is in the pin_* fields set by resolve(). */
+    if(!resolve(r,base,size,globals)) { r->failure="MODULE_PINS"; return 0; }
     r->pass=1;
     if(!graph(r,globals,&first)) {
         if(!r->failure) r->failure="GRAPH_IDENTITY";

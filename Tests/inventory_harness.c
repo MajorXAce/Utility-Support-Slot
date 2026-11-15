@@ -18,7 +18,7 @@ static unsigned session_calls,change_session,initial_role;
 static Reader last_reader;
 static char last_log[1024];
 static unsigned changing_kind,kind_reads;
-static unsigned module_calls,module_change;
+static unsigned module_calls,module_change,module_small,module_nobase;
 static char inventory_mod_marker;
 #define MOD ((HfMod*)&inventory_mod_marker)
 #define BASE ((uintptr_t)0x10000000)
@@ -41,7 +41,7 @@ static int fake_read(uintptr_t a,void* out,size_t n)
     }
     return 1;
 }
-static uintptr_t module(const char* name,size_t* size){assert(!strcmp(name,"game.dll"));++module_calls;*size=0x4000000+(module_calls>1 && (module_change&2)?4096:0);return BASE+(module_calls>1 && (module_change&1)?4096:0);}
+static uintptr_t module(const char* name,size_t* size){assert(!strcmp(name,"game.dll"));++module_calls;*size=module_small?0x3326DC7:0x4000000+(module_calls>1 && (module_change&2)?4096:0);return module_nobase?0:BASE+(module_calls>1 && (module_change&1)?4096:0);}
 static uint32_t game_state(HfMod* m){assert(m==MOD);return HF_STATE_MISSION;}
 static const char* build_id(void){return "25480438";}
 static void log_line(HfMod* m,const char* fmt,...){va_list args;assert(m==MOD);va_start(args,fmt);vsnprintf(last_log,sizeof(last_log),fmt,args);va_end(args);++logs;}
@@ -60,7 +60,7 @@ static void setup(void)
     static const char* patterns[]={"488b1d????????488bf9448b4308443b4328720c488bcbe8ca490d00448b4308","488b05????????488d542448488b88e8000000448b4108e8361a2600488b0d2f","4c8b05????????33db8bcb458b4830458b5038440fafd2418d71ff4585c9744c","4c8b15????????7517b8ffffffff8bc84869c1d0010000490342604883c408c3","488b3d????????4c89742438448b4f28448b5f30440fafd8458d71ff4585c90f"};
     unsigned i,j;unsigned char *b,*h;uintptr_t roots[]={0x20000000,0x30000000,0x40000000,0x50000000,0x60000000};
     used=reads=fail_at=change_at=logs=subscribes=session_calls=change_session=0;
-    module_calls=module_change=initial_role=0;listener=NULL;registration_ok=1;
+    module_calls=module_change=module_small=module_nobase=initial_role=0;listener=NULL;registration_ok=1;
     changing_kind=kind_reads=0;
     atomic_store(&attempt,0);memset(&fake,0,sizeof(fake));
     fake.version=HF_MOD_SDK_VERSION;fake.size=(uint32_t)sizeof(fake);fake.read=fake_read;fake.module_base=module;
@@ -89,6 +89,47 @@ static unsigned char* fixture(uintptr_t at,size_t length)
     unsigned i;for(i=0;i<used;++i)if(segments[i].at==at){segments[i].n=length;return segments[i].data;}
     assert(0);return NULL;
 }
+/* BEGIN F6 RESOLVER BATTERY: outcome and exact game-read count of every resolver refusal, so diagnostics can never change a
+ * decision, plus the diagnostic detail each refusal now reports. Resolver signature i is read as the (i+1)-th game read of an
+ * observation, so a refusal at site i costs exactly i+1 reads. The expected bytes below are an independent copy of the first and
+ * last bytes of each signature (not derived from the code under test). */
+static void resolver_pin_check(unsigned site,const char* cause,int byte,unsigned actual,unsigned expected)
+{
+    static const uint32_t rvas[]={0x518C2A,0x3A4BDE,0x3A9E00,0x4AABCA,0xC30B8};
+    assert(last_reader.pin_valid && last_reader.pin_site==(int)site && last_reader.pin_rva==rvas[site]);
+    assert(last_reader.pin_cause && !strcmp(last_reader.pin_cause,cause) && last_reader.pin_byte==byte);
+    if(byte>=0)assert(last_reader.pin_actual==actual && last_reader.pin_expected==expected);
+}
+static void resolver_battery(void)
+{
+    static const uint32_t rvas[]={0x518C2A,0x3A4BDE,0x3A9E00,0x4AABCA,0xC30B8};
+    static const uint32_t targets[]={0x3326B90,0x3326468,0x3326738,0x3326420,0x3326DC0};
+    static const unsigned first_byte[]={0x48,0x48,0x4C,0x4C,0x48},last_byte[]={0x08,0x2F,0x4C,0xC3,0x0F};
+    Inventory out;unsigned site;
+    for(site=0;site<5;++site){
+        unsigned char* b;
+        setup();fixture(BASE+rvas[site],32)[0]^=1;assert(!sample(&out));
+        assert(reads==site+1 && last_reader.calls==site+1 && !strcmp(last_reader.failure,"MODULE_PINS"));
+        resolver_pin_check(site,"BYTE",0,first_byte[site]^1u,first_byte[site]);
+        setup();fixture(BASE+rvas[site],32)[31]^=1;assert(!sample(&out));
+        assert(reads==site+1 && last_reader.calls==site+1 && !strcmp(last_reader.failure,"MODULE_PINS"));
+        resolver_pin_check(site,"BYTE",31,last_byte[site]^1u,last_byte[site]);
+        setup();b=fixture(BASE+rvas[site],32);put32(b+3,u32(b+3)+1);assert(!sample(&out));      /* global moved by one byte */
+        assert(reads==site+1 && last_reader.calls==site+1 && !strcmp(last_reader.failure,"MODULE_PINS"));
+        resolver_pin_check(site,"GLOBAL",-1,0,0);
+        assert(last_reader.pin_global_rva==targets[site]+1 && last_reader.pin_expected_global_rva==targets[site]);
+        setup();fail_at=site+1;assert(!sample(&out));                                             /* the read itself fails */
+        assert(reads==site+1 && last_reader.calls==site+1 && !strcmp(last_reader.failure,"MODULE_PINS"));
+        resolver_pin_check(site,"READ",-1,0,0);
+        assert(last_reader.detail && !strcmp(last_reader.detail,"READ_STATUS"));                 /* the precise read failure survives */
+    }
+    setup();module_small=1;assert(!sample(&out));assert(reads==0 && !strcmp(last_reader.failure,"MODULE_PINS"));
+    assert(last_reader.pin_valid && last_reader.pin_site==-1 && !strcmp(last_reader.pin_cause,"MODULE_SIZE"));
+    setup();module_nobase=1;assert(!sample(&out));assert(reads==0 && !strcmp(last_reader.failure,"MODULE_PINS"));
+    assert(last_reader.pin_valid && last_reader.pin_site==-1 && !strcmp(last_reader.pin_cause,"MODULE_BASE"));
+    setup();assert(sample(&out));assert(!last_reader.pin_valid && !last_reader.detail);        /* the accepted baseline says nothing */
+}
+/* END F6 RESOLVER BATTERY */
 static void distinct_slots(void)
 {
     unsigned char* b;unsigned k;
@@ -128,6 +169,7 @@ int main(void)
         assert(!final_context(&rr,&first,&second,BASE,BASE+1,4096,8192)); assert(rr.final_reasons==14);
         assert(!rr.predicate_valid && !rr.expected_entity && !rr.observed_entity && !rr.observed_kind);
     }
+    resolver_battery();
     setup();module_change=1;assert(!sample(&out));assert(module_calls==2 && last_reader.final_reasons==4);
     setup();module_change=2;assert(!sample(&out));assert(module_calls==2 && last_reader.final_reasons==8);
     setup(); {Reader rr={0};rr.api=&fake;assert(inventory_sample(&rr,&out));

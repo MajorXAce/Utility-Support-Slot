@@ -3,6 +3,7 @@
 #define USS_PAIR_MEMBER_H
 #include "../ResearchSource/inventory_reader.h"
 #include "weapon_policy.h"
+#include "uss_member_pin.h"
 
 typedef enum UssMemberStatus {
     USS_MEMBER_UNKNOWN=0, USS_MEMBER_EMPTY, USS_MEMBER_OBSERVED
@@ -89,10 +90,6 @@ static inline UssMemberEvidence uss_observe_pair_member(const HfApi* api,HfMod* 
     size_t size=0,end_size=0;
     const char* build;
     unsigned char pin[32];
-    /* Retained 978AC0 setter prefix; RIP load at978AD4 resolves3326D68. Pin only. */
-    static const unsigned char expected_pin[32]={
-        0x40,0x53,0x41,0x54,0x41,0x57,0x48,0x83,0xec,0x20,0x3b,0x15,0x50,0xb1,0xb0,0x02,
-        0x45,0x0f,0xb6,0xf9,0x48,0x8b,0x1d,0x8d,0xe2,0x9a,0x02,0x45,0x8b,0xe0,0x0f,0x84};
     /* Preserve a supplied transaction budget, never grant a second read allowance. */
     if (diagnostics) {reader.calls=diagnostics->calls;reader.bytes=diagnostics->bytes;}
     reader.api=api;reader.slot=-1;
@@ -107,7 +104,7 @@ static inline UssMemberEvidence uss_observe_pair_member(const HfApi* api,HfMod* 
     base=api->module_base("game.dll",&size);
     reader.stage="INTERACTION_PIN";
     if (!base || size<0x3326DC8 || size>0x20000000 || !address_ok(base,size) ||
-        !get(&reader,base+0x978AC0,pin,32) || memcmp(pin,expected_pin,32) ||
+        !get(&reader,base+USS_MEMBER_PIN_RVA,pin,USS_MEMBER_PIN_BYTES) || !uss_member_pin_matches(pin) ||
         (int64_t)0x978AD4+7+(int32_t)u32(pin+23)!=0x3326D68) {
         reader.failure="INTERACTION_PIN";goto done;
     }

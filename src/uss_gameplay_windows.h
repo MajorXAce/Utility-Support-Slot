@@ -11,6 +11,6 @@ static inline UssGameplayLoopIo uss_gameplay_windows_io(void* user,
     int (*policy)(void*,UssCoreFlags*),
     unsigned (*control)(void*,UssCoreLifecycle*,const UssCoreObservation*,uint64_t))
 {
-    UssGameplayLoopIo io={user,uss_gameplay_windows_clock,uss_gameplay_windows_thread,policy,control,NULL,NULL,NULL,NULL};return io;
+    UssGameplayLoopIo io={user,uss_gameplay_windows_clock,uss_gameplay_windows_thread,policy,control,NULL,NULL,NULL,NULL,NULL,NULL};return io;
 }
 #endif

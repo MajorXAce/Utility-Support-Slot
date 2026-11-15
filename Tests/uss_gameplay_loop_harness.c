@@ -1,7 +1,16 @@
+#include <stdarg.h>
 #include "../src/uss_gameplay_windows.h"
 #define USS_REFILL_CORE_TEST_MAIN refill_core_regressions
 #include "uss_refill_core_harness.c"
 static HfTickCallback registered_callback;static void* registered_user;
+/* Captures only the Core refusal lines, so the tests below can count them and read their text. */
+static unsigned refusal_lines;static char refusal_text[512];
+static void capture_log(HfMod* mod,const char* format,...)
+{
+    char line[512];va_list args;(void)mod;
+    va_start(args,format);vsnprintf(line,sizeof(line),format,args);va_end(args);
+    if(!strncmp(line,"USS core refusal",16)){++refusal_lines;memcpy(refusal_text,line,sizeof(line));}
+}
 static unsigned registrations,registration_result,policy_known,control_result,controls,thread_value,reenter;
 static uint64_t now_ms;static UssGameplayLoop loop;
 static unsigned frames,frame_reenter,frame_wake;static float frame_dt;
@@ -25,7 +34,7 @@ static int register_loop(HfMod* mod,HfTickCallback callback,void* user)
 }
 static UssGameplayLoopIo loop_fixture(void)
 {
-    UssGameplayLoopIo io={NULL,loop_clock,loop_thread,loop_policy,loop_control,NULL,NULL,NULL,loop_frame};
+    UssGameplayLoopIo io={NULL,loop_clock,loop_thread,loop_policy,loop_control,NULL,NULL,NULL,loop_frame,NULL,NULL};
     refill_core_fixture();
     {unsigned char* bytes=segment(0x80002000,24);put32(bytes+8,22);
         bytes=segment(ACTION_MANAGER+0x53dcd0+0x9ec,16);put32(bytes,22);}
@@ -33,12 +42,28 @@ static UssGameplayLoopIo loop_fixture(void)
     registrations=controls=reenter=frames=frame_reenter=0;registration_result=policy_known=1;control_result=USS_CONTROL_IDLE;
     thread_value=7;now_ms=1000;fake.on_game_thread=register_loop;return io;
 }
+static int allow_defer(void* user){(void)user;return 1;}
 int main(void)
 {
     UssGameplayLoopIo io;unsigned before;UssSupplySnapshot supply;UssRefillTarget target;unsigned have_supply;UssCoreObservation observation;
     (void)refill_core_regressions;
     {UssGameplayLoopIo windows=uss_gameplay_windows_io(NULL,loop_policy,loop_control);uint64_t first=windows.clock_ms(NULL);
         assert(windows.thread_id(NULL)==GetCurrentThreadId() && windows.clock_ms(NULL)>=first);}
+
+    /* P4: a known idle input-only block must not retire an otherwise valid pair.
+     * No observation/controller runs while blocked; clearing policy needs fresh reads. */
+    io=loop_fixture();io.policy_defer_idle=allow_defer;
+    assert(uss_gameplay_loop_register(&loop,&fake,MOD,&life,&io));
+    registered_callback(MOD,0,registered_user);
+    {uint64_t guard=life.owner.guard_generation;unsigned n=reads,c=controls;
+     policy_known=0;now_ms+=100;registered_callback(MOD,0,registered_user);
+     assert(!strcmp(loop.reason,"POLICY_IDLE_DEFERRED")&&life.owner.guard_generation==guard&&reads==n&&controls==c);
+     policy_known=1;now_ms+=100;registered_callback(MOD,0,registered_user);assert(reads>n&&controls==c+1);}
+    /* Without idle approval, retain the old interruption and no-read behavior. */
+    {uint64_t guard=life.owner.guard_generation;unsigned n=reads;
+     loop.io.policy_defer_idle=NULL;policy_known=0;now_ms+=100;registered_callback(MOD,0,registered_user);
+     assert(!strcmp(loop.reason,"POLICY_PAUSED")&&life.owner.guard_generation>guard&&reads==n);}
+
 
     io=loop_fixture();assert(uss_gameplay_loop_register(&loop,&fake,MOD,&life,&io));
     assert(registrations==1 && !controls && !loop.updates);registered_callback(MOD,0,registered_user);
@@ -86,6 +111,30 @@ int main(void)
     now_ms=999;before=reads;registered_callback(MOD,0,registered_user);assert(!atomic_load(&loop.enabled) && reads==before);
     io=loop_fixture();assert(uss_gameplay_loop_register(&loop,&fake,MOD,&life,&io));registered_callback((HfMod*)1,0,registered_user);
     assert(!atomic_load(&loop.enabled) && !controls);
+    /* Core refusal log (diagnostic only): names the refused resolver signature, logs again only when the cause changes, and
+     * stops at the 16-line cap. The refused observation is the same refusal as before; only its explanation is new. */
+    io=loop_fixture();fake.log=capture_log;refusal_lines=0;assert(uss_gameplay_loop_register(&loop,&fake,MOD,&life,&io));
+    fixture(BASE+0x3A4BDE,32)[14]^=1;                                       /* byte 14 of signature site 1 differs */
+    registered_callback(MOD,0,registered_user);
+    assert(refusal_lines==1 && strstr(refusal_text,"failure=MODULE_PINS") && strstr(refusal_text,"stage=MODULE_PINS"));
+    assert(strstr(refusal_text,"pin_site=1 pin_rva=0x3A4BDE pin_cause=BYTE pin_byte=14 pin_actual=0x"));
+    assert(strstr(refusal_text,"pin_expected=0x"));
+    now_ms+=100;registered_callback(MOD,0,registered_user);now_ms+=100;registered_callback(MOD,0,registered_user);
+    assert(refusal_lines==1);                                               /* same cause again: not repeated */
+    fixture(BASE+0x518C2A,32)[0]^=1;                                        /* site 0 is read first and now refuses instead */
+    now_ms+=100;registered_callback(MOD,0,registered_user);
+    assert(refusal_lines==2 && strstr(refusal_text,"pin_site=0 pin_rva=0x518C2A pin_cause=BYTE pin_byte=0"));
+    {unsigned flip;for(flip=0;flip<40;++flip){                              /* alternate two causes: logs every change until the cap */
+        fixture(BASE+0x518C2A,32)[flip&1?0:1]^=1;fixture(BASE+0x518C2A,32)[flip&1?1:0]^=1;
+        now_ms+=100;registered_callback(MOD,0,registered_user);}}
+    assert(refusal_lines==16);
+    fixture(BASE+0x518C2A,32)[5]^=1;now_ms+=100;registered_callback(MOD,0,registered_user);assert(refusal_lines==16);
+    /* A refusal with only a sub-check name (no resolver signature) reports it as detail=. */
+    io=loop_fixture();fake.log=capture_log;refusal_lines=0;assert(uss_gameplay_loop_register(&loop,&fake,MOD,&life,&io));
+    put32(fixture(SESSION+0x162D8,4),8);                                    /* eight peers: above the four this build can publish */
+    registered_callback(MOD,0,registered_user);
+    assert(refusal_lines==1 && strstr(refusal_text,"failure=CORE_SCOPE") && strstr(refusal_text,"detail=PEER_COUNT_ABOVE_LIMIT"));
+    assert(!strstr(refusal_text,"pin_site"));
     /* Reusing the normal update's observation performs fewer reads than the
      * independent fresh mutation boundary. This is count evidence, not latency. */
     refill_core_fixture();assert(uss_refill_core_supply(&core,&supply));before=reads;

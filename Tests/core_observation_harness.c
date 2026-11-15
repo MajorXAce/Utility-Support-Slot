@@ -40,6 +40,67 @@ static void core_pair(void)
     assert(uss_pair_owner_set_pair(&core_owner,7,0,&utility,&ordinary));
     reads=module_calls=session_calls=core_threads=0;
 }
+/* BEGIN GENERATED F6 DIAGNOSTICS BATTERY: every case freezes the accept/refuse outcome AND the exact number of game reads
+ * measured on the code BEFORE the diagnostics were added; the detail checks were added with the diagnostics. */
+static void diag_check(const char* name,int valid,int want_valid,unsigned got_reads,unsigned want_reads)
+{
+    if(want_reads==0xFFFFFFFFu)printf("MEASURE %s valid=%d reads=%u\n",name,valid,got_reads);
+    else if(got_reads!=want_reads){fprintf(stderr,"%s: reads %u, expected %u\n",name,got_reads,want_reads);assert(0);}
+    if((valid!=0)!=want_valid){fprintf(stderr,"%s: outcome changed\n",name);assert(0);}
+}
+static void diagnostics_battery(void)
+{
+    UssCoreObservation current;unsigned char* b;unsigned byte;(void)b;
+    core_fixture();core_pair();core_state=HF_STATE_NONE;current=core_read();diag_check("sdk_state_none",current.valid,0,reads,0);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"SDK_STATE"));
+    core_fixture();core_pair();fixture(BASE+0x144024,7)[0]^=1;current=core_read();diag_check("state_pin_first_byte",current.valid,0,reads,1);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"STATE_PIN_BYTES"));
+    core_fixture();core_pair();fixture(BASE+0x144024,7)[6]^=1;current=core_read();diag_check("state_pin_last_byte",current.valid,0,reads,1);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"STATE_PIN_BYTES"));
+    core_fixture();core_pair();fail_at=1;current=core_read();diag_check("state_pin_read_fails",current.valid,0,reads,1);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"STATE_PIN_READ"));
+    core_fixture();core_pair();putptr(fixture(BASE+0x3326340,8),0);current=core_read();diag_check("state_pointer_zero",current.valid,0,reads,2);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"STATE_POINTER"));
+    core_fixture();core_pair();putptr(fixture(BASE+0x33266A0,8),0);current=core_read();diag_check("mode_pointer_zero",current.valid,0,reads,3);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"MODE_POINTER"));
+    core_fixture();core_pair();core_state=HF_STATE_SHIP;current=core_read();diag_check("mission_state_mismatch",current.valid,0,reads,5);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"MISSION_MISMATCH"));
+    core_fixture();core_pair();initial_role=99;current=core_read();diag_check("role_not_supported",current.valid,0,reads,5);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"SESSION_ROLE"));
+    core_fixture();core_pair();putptr(fixture(BASE+0x347CEF0,8),0);current=core_read();diag_check("session_pointer_zero",current.valid,0,reads,6);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"SESSION_POINTER"));
+    core_fixture();core_pair();putptr(fixture(BASE+0x346BF98,8),0);current=core_read();diag_check("mapping_pointer_zero",current.valid,0,reads,7);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"MAPPING_POINTER"));
+    core_fixture();core_pair();put32(fixture(SESSION+0x162D8,4),0);current=core_read();diag_check("peer_count_zero",current.valid,0,reads,8);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"PEER_COUNT_ZERO"));
+    core_fixture();core_pair();put32(fixture(SESSION+0x162D8,4),5);current=core_read();diag_check("peer_count_five",current.valid,0,reads,8);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"PEER_COUNT_ABOVE_LIMIT"));
+    core_fixture();core_pair();put32(fixture(SESSION+0x162D8,4),8);current=core_read();diag_check("peer_count_eight",current.valid,0,reads,8);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"PEER_COUNT_ABOVE_LIMIT"));
+    core_fixture();core_pair();memset(fixture(SESSION+0xB398,8),0,8);current=core_read();diag_check("self_identity_zero",current.valid,0,reads,9);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"SELF_ZERO"));
+    core_fixture();core_pair();b=fixture(SESSION+0x162E0,16);memcpy(b+8,b,8);current=core_read();diag_check("peer_duplicate",current.valid,0,reads,11);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"PEER_DUPLICATE"));
+    core_fixture();core_pair();memset(fixture(SESSION+0x162E0,16)+8,0,8);current=core_read();diag_check("peer_entry_zero",current.valid,0,reads,11);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"PEER_ZERO"));
+    core_fixture();core_pair();fixture(SESSION+0xB398,8)[0]=3;current=core_read();diag_check("self_not_listed",current.valid,0,reads,11);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"SELF_NOT_LISTED"));
+    core_fixture();core_pair();fixture(SESSION+0xB3A8,8)[0]=2;current=core_read();diag_check("host_listed_but_not_self",current.valid,0,reads,11);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"PEER_ROLE_REMOTE"));
+    core_fixture();core_pair();fixture(SESSION+0xB3A8,8)[0]=7;current=core_read();diag_check("host_not_listed",current.valid,0,reads,11);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"HOST_NOT_LISTED"));
+    core_fixture();core_pair();put32(fixture(SESSION+0x162D8,4),1);initial_role=HF_SESSION_JOINER;current=core_read();diag_check("single_peer_joiner",current.valid,0,reads,11);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"PEER_ROLE_LOCAL"));
+    core_fixture();core_pair();initial_role=HF_SESSION_SOLO;current=core_read();diag_check("several_peers_solo_role",current.valid,0,reads,11);
+    assert(last_reader.detail && !strcmp(last_reader.detail,"PEER_ROLE_REMOTE"));
+    for(byte=0;byte<32;++byte){
+        core_fixture();core_pair();fixture(BASE+0x978AC0,32)[byte]^=0x40;current=core_read();
+        diag_check("member_pin_byte",current.valid,0,reads,122);
+        assert(last_reader.stage && !strcmp(last_reader.stage,"CORE_MEMBER_PIN") && last_reader.detail && !strcmp(last_reader.detail,"MEMBER_PIN_BYTES"));
+    }
+    core_fixture();fixture(BASE+0x978AC0,32)[5]^=0x40;current=core_read();diag_check("member_pin_unpaired_not_checked",current.valid,1,reads,241);
+}
+/* END GENERATED F6 DIAGNOSTICS BATTERY */
 #ifndef USS_CORE_TEST_MAIN
 #define USS_CORE_TEST_MAIN main
 #endif
@@ -108,6 +169,13 @@ int USS_CORE_TEST_MAIN(void)
     core_fixture();core_pair();assert(!uss_observe_action_state(&fake,MOD,NULL).valid);
     assert(!uss_observe_primary_readiness(&fake,MOD,&capture_input.owner,NULL).valid);
     assert(uss_observe_pair_member(&fake,MOD,&capture_input.owner,103,capture_input.utility_identity,NULL).status!=USS_MEMBER_OBSERVED);
+    /* Diagnostics candidate retains public 0.8.1 rejection of every changed
+     * player-array displacement byte; the unaccepted 8PM wildcard is excluded. */
+    {unsigned byte;for(byte=15;byte<19;++byte){
+        core_fixture();fixture(BASE+0x3A4BDE,32)[byte]^=0x55;
+        current=core_read();assert(!current.valid);
+    }}
+    diagnostics_battery();
     puts("Core adapter: explicit lifecycle, unknown/exit distinction, stale snapshots, peers, idle readiness and partial-read refusals PASS");
     return 0;
 }

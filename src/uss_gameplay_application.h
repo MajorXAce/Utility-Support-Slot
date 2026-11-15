@@ -54,6 +54,24 @@ static int application_formation_effect(void* user,UssFormationEffect effect,uin
     UssGameplayApplication* app=user;
     return app->environment.formation_effect(app->environment.effect_user,effect,first,second,record,inventory,avatar,value,message);
 }
+/* Log-only: why the player policy last refused (a fixed string chosen by the branch that ran). */
+static const char* application_policy_reason(void* user)
+{UssGameplayApplication* app=user;return app->input.reason;}
+/* A blocked shortcut is not a failed inventory transaction. Do not interrupt a
+ * settled pair for a menu/overlay, but never let this shortcut mask active work. */
+static int application_policy_defer_idle(void* user)
+{
+    UssGameplayApplication* app=user;const char* why=app->input.reason;
+    if(!why || (strcmp(why,"PLAYER_NOT_FOREGROUND") && strcmp(why,"PLAYER_BINDING_CAPTURE") &&
+        strcmp(why,"PLAYER_UI_READ_UNKNOWN") && strcmp(why,"PLAYER_CHAT_ACTIVE") && strcmp(why,"PLAYER_ESCAPE_ACTIVE")))return 0;
+    if(!app->initialized)return 1; /* No service has begun, so there is nothing to interrupt. */
+    if(app->loop.handling_paused || app->loop.refill.busy || app->player.pending.present || app->formation.busy || app->formation.publication.busy ||
+        (app->formation.work.phase!=USS_PAIR_IDLE && app->formation.work.phase!=USS_PAIR_COMPLETE) ||
+        (app->automatic.replacement.phase!=USS_REPLACE_IDLE && app->automatic.replacement.phase!=USS_REPLACE_COMPLETE) ||
+        app->recovery.waiting || (app->recovery.work.phase!=USS_RECOVERY_IDLE && app->recovery.work.phase!=USS_RECOVERY_COMPLETE) ||
+        (app->formation.life.phase!=USS_LIFE_EMPTY && app->formation.life.phase!=USS_LIFE_FORMED))return 0;
+    return 1;
+}
 static int application_policy(void* user,UssCoreFlags* flags)
 {
     UssGameplayApplication* app=user;UssFormationIo io;unsigned thread;
@@ -199,7 +217,7 @@ static inline int uss_gameplay_application_register(UssGameplayApplication* app,
     }
     io.frame=application_menu_frame;
     io.recover=application_recovery;io.lifecycle=application_lifecycle;io.refilled=application_refilled;
-    io.user=app;io.clock_ms=application_clock;io.thread_id=application_thread;io.policy=application_policy;io.control=application_control;
+    io.user=app;io.clock_ms=application_clock;io.thread_id=application_thread;io.policy=application_policy;io.policy_reason=application_policy_reason;io.policy_defer_idle=application_policy_defer_idle;io.control=application_control;
     app->reason="REGISTERING_NORMAL_GAMEPLAY";
     if(!uss_gameplay_loop_register(&app->loop,api,mod,&app->formation.life,&io)){
         app->reason="APPLICATION_CALLBACK_FAILED";return 0;

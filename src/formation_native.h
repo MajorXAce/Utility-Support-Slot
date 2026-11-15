@@ -14,6 +14,8 @@ typedef struct UssFormationNative {
     UssFormationRuntime* runtime;
     unsigned effects;
     const char* reason;
+    /* Log-only attribution of attachment refusals: the last logged reason and how many lines were written (capped). */
+    const char* attach_logged_reason;unsigned attach_logs;
     /* Required explicit binding: production or own fixture. Never an unchecked
      * alternative path; the adapter validates entry bytes/page/context first. */
     int (*invoke)(void*,UssFormationEffect,uintptr_t,uintptr_t,uintptr_t,uintptr_t,uint32_t,uint32_t,const UssInventoryMessage*);
@@ -170,17 +172,41 @@ static inline UssPairServiceResult formation_native_select_single(UssFormationNa
         after.inventory.active_selector!=3 || after.inventory.held!=current.inventory.slots[2])return USS_PAIR_SERVICE_STOP;
     return USS_PAIR_SERVICE_DONE;
 }
+/* Name the FIRST attachment boundary that refused. Log-only: it records a fixed string (and two values the caller already
+ * read) and never re-evaluates a predicate, so the accept/refuse decision and the read count are unchanged. At most 8 lines
+ * per session, one per changed reason, so a repeating refusal cannot flood the log. */
+static UssPairServiceResult formation_native_attach_refused(UssFormationNative* native,const char* reason,
+    const UssMemberEvidence* evidence)
+{
+    native->reason=reason;
+    if(native->attach_logged_reason!=reason && native->attach_logs<8 && native->api && native->api->log && native->mod){
+        native->attach_logged_reason=reason;++native->attach_logs;
+        if(evidence && !strcmp(reason,"ATTACH_INTERACTION_NOT_ADMISSIBLE"))
+            native->api->log(native->mod,"USS attach refused: %s gate=%u zone=0x%08X parent=%u",reason,
+                (unsigned)evidence->gate,(unsigned)evidence->zone,(unsigned)evidence->parent);
+        else native->api->log(native->mod,"USS attach refused: %s",reason);
+    }
+    return USS_PAIR_SERVICE_STOP;
+}
 static UssPairServiceResult formation_native_attach(void* user,const UssCoreObservation* expected,const UssPairMember* member)
 {
     UssFormationNative* native=user;UssCoreObservation current;const UssMemberEvidence* evidence;
     uintptr_t base=formation_native_module(native);
-    if(!base || !member || !formation_native_current_scope(native,expected,&current,0) || !formation_draw_ready(native->runtime,&current))return USS_PAIR_SERVICE_STOP;
+    /* The original single condition is kept term for term, in the same order; each term only gains a name. */
+    if(!base)return USS_PAIR_SERVICE_STOP; /* no native context to record into */
+    if(!member)return formation_native_attach_refused(native,"ATTACH_NO_MEMBER",NULL);
+    if(!formation_native_current_scope(native,expected,&current,0))return formation_native_attach_refused(native,"ATTACH_SCOPE_BEFORE",NULL);
+    if(!formation_draw_ready(native->runtime,&current))return formation_native_attach_refused(native,"ATTACH_DRAW_NOT_READY_BEFORE",NULL);
     evidence=member->entity==native->runtime->life.owner.utility.entity?&current.utility:&current.ordinary;
-    if(evidence->status!=USS_MEMBER_OBSERVED || evidence->entity!=member->entity ||
-        memcmp(evidence->descriptor,member->identity,8) || !evidence->interaction_admissible ||
-        (evidence->parent && evidence->parent!=current.inventory.avatar) ||
-        !formation_native_entry(native,base,0x9AA290,uss_attachment_entry_pin,64) ||
-        !formation_native_current_scope(native,expected,&current,0) || !formation_draw_ready(native->runtime,&current))return USS_PAIR_SERVICE_STOP;
+    if(evidence->status!=USS_MEMBER_OBSERVED || evidence->entity!=member->entity)
+        return formation_native_attach_refused(native,"ATTACH_MEMBER_NOT_OBSERVED",evidence);
+    if(memcmp(evidence->descriptor,member->identity,8))return formation_native_attach_refused(native,"ATTACH_MEMBER_IDENTITY",evidence);
+    if(!evidence->interaction_admissible)return formation_native_attach_refused(native,"ATTACH_INTERACTION_NOT_ADMISSIBLE",evidence);
+    if(evidence->parent && evidence->parent!=current.inventory.avatar)return formation_native_attach_refused(native,"ATTACH_PARENT_NOT_LOCAL",evidence);
+    if(!formation_native_entry(native,base,0x9AA290,uss_attachment_entry_pin,64))return formation_native_attach_refused(native,"ATTACH_ENTRY_PIN",NULL);
+    if(!formation_native_current_scope(native,expected,&current,0))return formation_native_attach_refused(native,"ATTACH_SCOPE_AFTER_PIN",NULL);
+    if(!formation_draw_ready(native->runtime,&current))return formation_native_attach_refused(native,"ATTACH_DRAW_NOT_READY_AFTER_PIN",NULL);
+    native->reason="ATTACH_ENTERED";
     ++native->effects;
     return native->invoke(native->invoke_user,USS_EFFECT_ATTACH,base+0x9AA290,0,0,
         current.inventory.roots[2],current.inventory.avatar,member->entity,NULL)?USS_PAIR_SERVICE_DONE:USS_PAIR_SERVICE_STOP;

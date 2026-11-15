@@ -9,6 +9,7 @@ typedef struct UssRecoveryRuntime {
     /* Stored-member-lost confirmation: the entity under test, consecutive clean absences, first absence time. */
     uint32_t lost_entity;unsigned lost_count;uint64_t lost_since;
     const char* declined;unsigned declined_logs; /* last logged reason the stored-member check declined, and how many lines so far */
+    unsigned stop_logs; /* lines written by the recovery-stop attribution below (log-only, capped) */
 } UssRecoveryRuntime;
 /* The STORED member of an idle pair vanished from the game (for example the Solo Silo was destroyed and the game deleted its
  * remote). Observed live: the weapon-manager row and the WeaponLinker entry of the stored remote were gone while the real
@@ -71,7 +72,7 @@ static inline unsigned uss_recovery_stored_lost(UssRecoveryRuntime* recovery,uin
             (unsigned)stored_entity,(unsigned)real_entity);
     return USS_STORED_LOST_CLEARED;
 }
-static inline unsigned uss_recovery_control(UssRecoveryRuntime* recovery,const UssCoreObservation* current,uint64_t now)
+static inline unsigned recovery_control_step(UssRecoveryRuntime* recovery,const UssCoreObservation* current,uint64_t now)
 {
     UssFormationRuntime* runtime=recovery->native.formation->runtime;UssPairOwner* owner=&runtime->life.owner;
     UssRecoveryIo io=uss_recovery_native_io(&recovery->native);UssRecoveryWork candidate={0};UssRecoverySnapshot snapshot;
@@ -113,7 +114,7 @@ static inline unsigned uss_recovery_control(UssRecoveryRuntime* recovery,const U
         if(lost==USS_STORED_LOST_STOP)return USS_CONTROL_STOP;
         if(lost!=USS_STORED_LOST_NO)return USS_CONTROL_WORK; /* confirming or just cleared: poll again soon */}
     if(!recovery->waiting){recovery->waiting=1;recovery->wait_started=now;}
-    if(now<recovery->wait_started || now-recovery->wait_started>=2000){
+    if(now<recovery->wait_started || now-recovery->wait_started>=USS_RECOVERY_RESTORE_WAIT_MS){
         recovery->reason="RECOVERY_PREFLIGHT_TIMEOUT";return USS_CONTROL_STOP;
     }
     candidate.owner=*owner;candidate.outgoing=recovery->real==owner->utility.entity?owner->utility:owner->ordinary;
@@ -137,5 +138,32 @@ static inline unsigned uss_recovery_control(UssRecoveryRuntime* recovery,const U
     uss_local_pair_invalidate(&runtime->local);
     recovery->automatic->origin_valid=0;recovery->reason=recovery->work.reason;
     return USS_CONTROL_WORK;
+}
+static inline const char* recovery_phase_text(UssRecoveryPhase phase)
+{
+    switch(phase){case USS_RECOVERY_IDLE:return "IDLE";case USS_RECOVERY_ATTACH:return "ATTACH";case USS_RECOVERY_PRIMARY:return "PRIMARY";
+        case USS_RECOVERY_SEND:return "SEND";case USS_RECOVERY_SELECTION:return "SELECTION";case USS_RECOVERY_DEATH_WAIT:return "DEATH_WAIT";
+        case USS_RECOVERY_COMPLETE:return "COMPLETE";case USS_RECOVERY_CANCELLED:return "CANCELLED";}
+    return "UNKNOWN";
+}
+/* Recovery STOP is terminal for this actor's handling (the loop stays paused), so it must never be silent. This wrapper only
+ * reads the work record the stop already filled in: it adds no game read and changes no decision. The first lines per
+ * session (capped) name the reason, the phase, which native effects had been consumed (bit n = effect n) and how long the
+ * recovery had been running, which is what separates "gave up before touching anything" from "an effect was already entered". */
+static inline unsigned uss_recovery_control(UssRecoveryRuntime* recovery,const UssCoreObservation* current,uint64_t now)
+{
+    unsigned result=recovery_control_step(recovery,current,now);
+    if(result==USS_CONTROL_STOP && recovery->stop_logs<4 && recovery->native.reader.api && recovery->native.reader.api->log &&
+        recovery->native.reader.mod){
+        const UssRecoveryWork* work=&recovery->work;
+        uint64_t since=work->phase==USS_RECOVERY_IDLE?recovery->wait_started:work->started;
+        ++recovery->stop_logs;
+        recovery->native.reader.api->log(recovery->native.reader.mod,
+            "USS recovery stopped: reason=%s phase=%s consumed=0x%x elapsed_ms=%llu detail=%s",
+            recovery->reason?recovery->reason:"NONE",recovery_phase_text(work->phase),work->consumed,
+            (unsigned long long)(now>=since?now-since:0),
+            recovery->native.formation && recovery->native.formation->reason?recovery->native.formation->reason:"NONE");
+    }
+    return result;
 }
 #endif

@@ -12,23 +12,44 @@ typedef enum UssRecoveryEffect {
     USS_RECOVERY_RESTORE=1,USS_RECOVERY_SELECT_PRIMARY,USS_RECOVERY_PUBLISH,
     USS_RECOVERY_SELECT_FINAL,USS_RECOVERY_DROP_STORED
 } UssRecoveryEffect;
+/* Why an observation was refused, when the reader knows. Set ONLY on a refused (invalid) snapshot, from facts it had already
+ * established; a valid snapshot keeps 0, so snapshot comparisons are unchanged. TRANSIENT means "could not read or coherently
+ * confirm" (the only kind a not-yet-effected recovery may wait out); the others are definitive and are never waited out. */
+enum { USS_RECOVERY_REFUSAL_TRANSIENT=0,USS_RECOVERY_REFUSAL_SURVIVOR_ABSENT,USS_RECOVERY_REFUSAL_CONTEXT_CHANGED,USS_RECOVERY_REFUSAL_CONTRACT };
+/* A recovery that has not yet entered its restore effect has changed nothing natively. It may wait this long (Lua waits without
+ * a limit) for a transient native state to settle; every later phase keeps its own 2000 ms window from the effect. */
+enum { USS_RECOVERY_RESTORE_WAIT_MS=10000,USS_RECOVERY_PHASE_WINDOW_MS=2000 };
 typedef struct UssRecoverySnapshot {
     unsigned valid,death,all_empty,outgoing_absent;Inventory inventory;
     UssMemberEvidence survivor,outgoing;UssPrimaryReadiness primary;
+    unsigned refusal;
 } UssRecoverySnapshot;
 typedef struct UssRecoveryWork {
     UssRecoveryPhase phase;UssPairOwner owner;UssPairMember survivor,outgoing;
     uint32_t selected;unsigned consumed,local_only;uint64_t started,deadline;
     const char* reason;
+    /* Set by recovery_effect when the restore was refused before ANY native entry (and its consumed bit was given back), and the
+     * earliest tick at which the pre-effect wait may try the restore again. */
+    unsigned refused_before_entry;uint64_t retry_after;
 } UssRecoveryWork;
 typedef struct UssRecoveryIo {
     void* user;int (*observe)(void*,const UssRecoveryWork*,UssRecoverySnapshot*);
     /* Return1 only after returned effect AND fresh verified readback. Never WAIT.
      * Callback must revalidate the supplied snapshot/entry at its own boundary. */
     int (*effect)(void*,const UssRecoveryWork*,const UssRecoverySnapshot*,UssRecoveryEffect,uint32_t);
+    /* Optional: the service's cumulative count of native calls it has ENTERED. If it did not move across a refused restore, no
+     * native call happened and nothing is uncertain. Without it every refusal stays consumed, exactly as before. */
+    unsigned (*entries)(void*);
 } UssRecoveryIo;
+enum { USS_RECOVERY_RETRY_MS=100 };
 static inline unsigned recovery_cancel(UssRecoveryWork* work,const char* reason)
 {work->phase=USS_RECOVERY_CANCELLED;work->reason=reason;return USS_CONTROL_STOP;}
+/* True only while nothing native has been entered for this recovery: the restore effect's bit is still clear in the ATTACH phase.
+ * Waiting then costs nothing and repeats nothing; the effect itself still revalidates a fresh observation when it finally runs. */
+static inline int recovery_pre_effect_wait(const UssRecoveryWork* work)
+{return work->phase==USS_RECOVERY_ATTACH && !(work->consumed&(1u<<(unsigned)USS_RECOVERY_RESTORE));}
+static inline uint64_t recovery_deadline(const UssRecoveryWork* work)
+{return recovery_pre_effect_wait(work)?work->started+USS_RECOVERY_RESTORE_WAIT_MS:work->deadline;}
 static inline int recovery_lifetime(const UssRecoveryWork* work,const UssPairOwner* owner)
 {
     return owner && !owner->disabled && owner->thread==work->owner.thread && owner->epoch==work->owner.epoch &&
@@ -38,9 +59,15 @@ static inline int recovery_lifetime(const UssRecoveryWork* work,const UssPairOwn
 static inline int recovery_effect(UssRecoveryWork* work,const UssRecoveryIo* io,const UssRecoverySnapshot* snapshot,
     UssRecoveryEffect effect,uint32_t slot)
 {
-    unsigned bit=1u<<(unsigned)effect;
+    unsigned bit=1u<<(unsigned)effect,before=io->entries?io->entries(io->user):0;int result;
     if((work->consumed&bit) || !io->effect)return 0;
-    work->consumed|=bit;return io->effect(io->user,work,snapshot,effect,slot);
+    work->consumed|=bit;work->refused_before_entry=0;
+    result=io->effect(io->user,work,snapshot,effect,slot);
+    /* Only the restore, and only while recovery is still before its first effect: a refusal that entered no native call is not
+     * an attempted restore (the same rule the readiness wait already follows), so the bit is given back. */
+    if(!result && effect==USS_RECOVERY_RESTORE && io->entries && io->entries(io->user)==before){
+        work->consumed&=~bit;work->refused_before_entry=1;}
+    return result;
 }
 static inline int recovery_publication_owned(const UssPublicationState* publication,const UssPairOwner* owner)
 {
@@ -59,7 +86,7 @@ static inline int recovery_begin(UssRecoveryWork* work,const UssPairOwner* owner
     UssRecoveryWork result={0};
     if(!work || !pair_owner_ready(owner,owner?owner->thread:0) || !snapshot || !snapshot->valid ||
         !(owner->context.local_only?uss_local_pair_owned(local,owner):recovery_publication_owned(publication,owner)) ||
-        (real!=owner->utility.entity && real!=owner->ordinary.entity) || now>UINT64_MAX-2000)return 0;
+        (real!=owner->utility.entity && real!=owner->ordinary.entity) || now>UINT64_MAX-USS_RECOVERY_RESTORE_WAIT_MS)return 0;
     result.local_only=owner->context.local_only;result.owner=*owner;result.outgoing=real==owner->utility.entity?owner->utility:owner->ordinary;
     result.survivor=real==owner->utility.entity?owner->ordinary:owner->utility;
     result.started=now;result.deadline=now+2000;result.selected=snapshot->inventory.active_selector;
@@ -79,9 +106,16 @@ static inline unsigned uss_recovery_tick(UssRecoveryWork* work,UssCoreLifecycle*
     if(!work || !life || !publication || !history || !io || !io->observe)return USS_CONTROL_STOP;
     if(work->phase==USS_RECOVERY_IDLE || work->phase==USS_RECOVERY_COMPLETE)return USS_CONTROL_IDLE;
     if(work->phase==USS_RECOVERY_CANCELLED)return USS_CONTROL_STOP;
-    if(now<work->started || now>=work->deadline || !recovery_lifetime(work,&life->owner))
-        return recovery_cancel(work,"RECOVERY_LIFETIME_OR_TIMEOUT");
-    if(!io->observe(io->user,work,&snapshot) || !snapshot.valid)return recovery_cancel(work,"RECOVERY_READ_UNKNOWN");
+    if(now<work->started || !recovery_lifetime(work,&life->owner))return recovery_cancel(work,"RECOVERY_LIFETIME_CHANGED");
+    if(now>=recovery_deadline(work))
+        return recovery_cancel(work,recovery_pre_effect_wait(work)?"RECOVERY_RESTORE_WAIT_EXPIRED":"RECOVERY_PHASE_TIMEOUT");
+    if(!io->observe(io->user,work,&snapshot) || !snapshot.valid){
+        /* Before any effect a transient read failure is a wait, not a verdict. A definitive refusal is never waited out. */
+        if(recovery_pre_effect_wait(work) && snapshot.refusal==USS_RECOVERY_REFUSAL_TRANSIENT){work->reason="WAIT_RECOVERY_READ_UNKNOWN";return USS_CONTROL_WORK;}
+        return recovery_cancel(work,snapshot.refusal==USS_RECOVERY_REFUSAL_SURVIVOR_ABSENT?"RECOVERY_SURVIVOR_GONE":
+            snapshot.refusal==USS_RECOVERY_REFUSAL_CONTEXT_CHANGED?"RECOVERY_CONTEXT_CHANGED":
+            snapshot.refusal==USS_RECOVERY_REFUSAL_CONTRACT?"RECOVERY_READ_CONTRACT":"RECOVERY_READ_UNKNOWN");
+    }
     if(work->phase==USS_RECOVERY_DEATH_WAIT){
         if(!snapshot.death)return recovery_cancel(work,"DEATH_CONTEXT_CHANGED");
         if(!snapshot.all_empty){
@@ -101,18 +135,31 @@ static inline unsigned uss_recovery_tick(UssRecoveryWork* work,UssCoreLifecycle*
     if(snapshot.death || snapshot.survivor.parent!=snapshot.inventory.avatar ||
         (!snapshot.outgoing_absent && snapshot.outgoing.parent!=0))return recovery_cancel(work,"SURVIVOR_OR_OUTGOING_CHANGED");
     if(work->phase==USS_RECOVERY_ATTACH){
-        if(snapshot.inventory.slots[2]!=0 || (snapshot.inventory.active_selector!=1 && snapshot.inventory.active_selector!=2))
-            return recovery_cancel(work,"RECOVERY_EMPTY_SELECTION_CHANGED");
+        if(snapshot.inventory.slots[2]!=0)return recovery_cancel(work,"RECOVERY_EMPTY_SELECTION_CHANGED");
+        /* Vanilla may not have left the emptied support slot yet (a knockdown can delay it). Nothing is selected or attached by
+         * us until it does; wait for it, as Lua does, inside the pre-effect bound. */
+        if(snapshot.inventory.active_selector!=1 && snapshot.inventory.active_selector!=2){work->reason="WAIT_RECOVERY_SELECTION";return USS_CONTROL_WORK;}
         /* A transient native selection block is not an attempted restore.
          * Observe again within the original deadline, before consuming effects. */
         if(snapshot.primary.valid && (snapshot.primary.fields.global_guard ||
             snapshot.primary.fields.state_byte || u32(snapshot.primary.fields.row+28))){
             work->reason="WAIT_RECOVERY_RESTORE_READY";return USS_CONTROL_WORK;
         }
-        if(!recovery_effect(work,io,&snapshot,USS_RECOVERY_RESTORE,0))return recovery_cancel(work,"SURVIVOR_RESTORE_FAILED");
+        /* If recovery began while the selection still pointed at the emptied support slot (3), restore the settled selection instead:
+         * the final selection effect only supports slots 1 and 2. The value is the one just verified in this snapshot. */
+        if(work->selected!=1 && work->selected!=2)work->selected=snapshot.inventory.active_selector;
+        if(now<work->retry_after){work->reason="WAIT_RECOVERY_RESTORE_RETRY";return USS_CONTROL_WORK;}
+        if(!recovery_effect(work,io,&snapshot,USS_RECOVERY_RESTORE,0)){
+            if(work->refused_before_entry){ /* nothing was entered: wait and try again, at a bounded rate, within the pre-effect limit */
+                work->refused_before_entry=0;work->retry_after=now+USS_RECOVERY_RETRY_MS;
+                work->reason="WAIT_RECOVERY_RESTORE_REFUSED_BEFORE_ENTRY";return USS_CONTROL_WORK;}
+            return recovery_cancel(work,"SURVIVOR_RESTORE_FAILED");
+        }
         if(!uss_pair_owner_clear_pair(&life->owner,life->owner.thread,work->owner.pair_generation))
             return recovery_cancel(work,"RECOVERY_PAIR_CLEAR_FAILED");
         life->phase=USS_LIFE_EMPTY;pickup_clear(history);work->phase=USS_RECOVERY_PRIMARY;
+        /* Each later phase gets its own window from the consumed restore, however long the pre-effect wait lasted. */
+        work->deadline=now+USS_RECOVERY_PHASE_WINDOW_MS;
         work->reason="SURVIVOR_RESTORED_PAIR_CLEARED";return USS_CONTROL_WORK;
     }
     if(snapshot.inventory.slots[2]!=work->survivor.entity)return recovery_cancel(work,"SURVIVOR_SLOT_CHANGED");

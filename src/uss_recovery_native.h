@@ -132,6 +132,9 @@ static int recovery_native_effect(void* user,const UssRecoveryWork* work,const U
 /* Typed production death-drop forwarding; constructor inclusion is inert. */
 static inline int uss_recovery_drop_invoke(void* user,uintptr_t entry,uintptr_t inventory,uint32_t avatar,uint32_t entity)
 {UssNativeCalls calls={0};(void)user;calls.drop_entity=(UssDropEntityFn)entry;return uss_drop_stored_entity(&calls,(void*)inventory,avatar,entity)==USS_CALL_RETURNED;}
+/* Native calls this service has entered so far (each effect increments it immediately before the call). */
+static unsigned recovery_native_entries(void* user)
+{UssRecoveryNative* native=user;return native && native->formation?native->formation->effects:0;}
 static inline UssRecoveryIo uss_recovery_native_io(UssRecoveryNative* native)
-{UssRecoveryIo io={native,recovery_native_observe,recovery_native_effect};return io;}
+{UssRecoveryIo io={native,recovery_native_observe,recovery_native_effect,recovery_native_entries};return io;}
 #endif

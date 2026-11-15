@@ -23,21 +23,29 @@ typedef struct UssCapturePeers {
     uint32_t count;unsigned is_host;
     unsigned char self[8],host[8],sorted[32],context[48];size_t size;
 } UssCapturePeers;
+/* Log-only: name which peer validation refused. Returns 0 so a caller can write return peers_refuse(...). */
+static int peers_refuse(UssCaptureReader* reader,const char* detail){reader->memory.detail=detail;return 0;}
 static int capture_peers(UssCaptureReader* reader,uintptr_t session,UssCapturePeers* out)
 {
     unsigned char raw[32],zero[8]={0};unsigned i,j,self_seen=0,host_seen=0;
     memset(out,0,sizeof(*out));
-    if(!capture_bytes(reader,session+0x162D8,&out->count,4,0) || out->count<1 || out->count>4 ||
-        !capture_bytes(reader,session+0xB398,out->self,8,0) || !memcmp(out->self,zero,8) ||
-        !capture_bytes(reader,session+0xB3A8,out->host,8,0) ||
-        !capture_bytes(reader,session+0x162E0,raw,out->count*8,0)) return 0;
+    /* Same checks in the same order as before; each refusal now says which one it was. The count limit of four is the
+     * storage this build proves for publication peers, not a statement about the game's real maximum. */
+    if(!capture_bytes(reader,session+0x162D8,&out->count,4,0))return peers_refuse(reader,"PEER_COUNT_READ");
+    if(out->count<1)return peers_refuse(reader,"PEER_COUNT_ZERO");
+    if(out->count>4)return peers_refuse(reader,"PEER_COUNT_ABOVE_LIMIT");
+    if(!capture_bytes(reader,session+0xB398,out->self,8,0))return peers_refuse(reader,"SELF_READ");
+    if(!memcmp(out->self,zero,8))return peers_refuse(reader,"SELF_ZERO");
+    if(!capture_bytes(reader,session+0xB3A8,out->host,8,0))return peers_refuse(reader,"HOST_READ");
+    if(!capture_bytes(reader,session+0x162E0,raw,out->count*8,0))return peers_refuse(reader,"PEER_ARRAY_READ");
     for(i=0;i<out->count;++i) {
-        if(!memcmp(raw+i*8,zero,8))return 0;
-        for(j=0;j<i;++j)if(!memcmp(raw+i*8,raw+j*8,8))return 0;
+        if(!memcmp(raw+i*8,zero,8))return peers_refuse(reader,"PEER_ZERO");
+        for(j=0;j<i;++j)if(!memcmp(raw+i*8,raw+j*8,8))return peers_refuse(reader,"PEER_DUPLICATE");
         if(!memcmp(raw+i*8,out->self,8))self_seen=1;
         if(!memcmp(raw+i*8,out->host,8))host_seen=1;
     }
-    if(!self_seen || (memcmp(out->host,zero,8) && !host_seen))return 0;
+    if(!self_seen)return peers_refuse(reader,"SELF_NOT_LISTED");
+    if(memcmp(out->host,zero,8) && !host_seen)return peers_refuse(reader,"HOST_NOT_LISTED");
     memcpy(out->sorted,raw,out->count*8);
     for(i=0;i<out->count;++i)for(j=i+1;j<out->count;++j)
         if(memcmp(out->sorted+i*8,out->sorted+j*8,8)>0) {

@@ -47,6 +47,22 @@ int USS_APPLICATION_TEST_MAIN(void)
 {
     UssGameplayEnvironment environment;uint64_t updates;unsigned before;
     (void)player_control_regressions;
+    /* P4 approval is software-only and must fail closed for every in-flight lane. */
+    {UssGameplayApplication x={0};unsigned n=reads;
+     const char* reasons[]={"PLAYER_NOT_FOREGROUND","PLAYER_BINDING_CAPTURE","PLAYER_UI_READ_UNKNOWN","PLAYER_CHAT_ACTIVE","PLAYER_ESCAPE_ACTIVE"};
+     for(unsigned i=0;i<5;++i){x.input.reason=reasons[i];assert(application_policy_defer_idle(&x));}
+     x.input.reason="PLAYER_SCOPE_UNKNOWN";assert(!application_policy_defer_idle(&x));
+     x.input.reason="PLAYER_CHAT_ACTIVE";x.initialized=1;assert(application_policy_defer_idle(&x));
+     x.formation.work.phase=USS_PAIR_ACTIVE;assert(!application_policy_defer_idle(&x));x.formation.work.phase=USS_PAIR_IDLE;
+     x.automatic.replacement.phase=USS_REPLACE_ACTIVE;assert(!application_policy_defer_idle(&x));x.automatic.replacement.phase=USS_REPLACE_IDLE;
+     x.recovery.waiting=1;assert(!application_policy_defer_idle(&x));x.recovery.waiting=0;
+     x.recovery.work.phase=USS_RECOVERY_ATTACH;assert(!application_policy_defer_idle(&x));x.recovery.work.phase=USS_RECOVERY_IDLE;
+     x.player.pending.present=1;assert(!application_policy_defer_idle(&x));x.player.pending.present=0;
+     x.formation.publication.busy=1;assert(!application_policy_defer_idle(&x));x.formation.publication.busy=0;
+     x.loop.refill.busy=1;assert(!application_policy_defer_idle(&x));x.loop.refill.busy=0;
+     x.loop.handling_paused=1;assert(!application_policy_defer_idle(&x));x.loop.handling_paused=0;
+     x.formation.life.phase=USS_LIFE_PAUSED;assert(!application_policy_defer_idle(&x));x.formation.life.phase=USS_LIFE_FORMED;
+     assert(application_policy_defer_idle(&x)&&reads==n);}
     environment=application_fixture();assert(uss_gameplay_application_register(&application,&fake,MOD,&environment,NULL));
     assert(app_registrations==1 && !application.initialized && !app_menu_frames);
     foreground_ok=0;app_callback(MOD,0,app_user);assert(!application.initialized && !application.loop.updates && !app_effects);

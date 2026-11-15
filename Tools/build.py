@@ -36,7 +36,7 @@ def main():
     (out/'build-receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
     if args.package:
         dist=ROOT/'dist';dist.mkdir(exist_ok=True);package=dist/('Utility-Support-Slot-v'+version+'.zip')
-        names=['hellforge-mod.json','icon.png','LICENSE','THIRD_PARTY_LICENSES.txt','README.md','release_notes.md',dll.name]
+        names=['hellforge-mod.json','icon.png','LICENSE','THIRD_PARTY_LICENSES.txt','README.md',dll.name]  # release_notes.md stays in the repo: the release workflow uses it as the GitHub release text, and a published ZIP can never be corrected
         import io
         data=io.BytesIO()
         with zipfile.ZipFile(data,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:

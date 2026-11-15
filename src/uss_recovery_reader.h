@@ -3,6 +3,7 @@
 #ifndef USS_RECOVERY_READER_H
 #define USS_RECOVERY_READER_H
 #include "uss_recovery.h"
+#include "uss_member_pin.h"
 typedef struct UssRecoveryReader {
     const HfApi* api;HfMod* mod;UssCorePlatform platform;const UssCoreFlags* policy;
 } UssRecoveryReader;
@@ -36,23 +37,30 @@ static inline int uss_recovery_observe(const UssRecoveryReader* source,const Uss
 {
     Reader memory={0};UssRecoverySnapshot result={0},again={0};UssCoreScope before={0},after={0};
     Inventory final_inventory;unsigned survivor_absent=0,again_absent=0;const char* build;unsigned char pin[32];
-    static const unsigned char member_pin[32]={0x40,0x53,0x41,0x54,0x41,0x57,0x48,0x83,0xec,0x20,0x3b,0x15,0x50,0xb1,0xb0,0x02,0x45,0x0f,0xb6,0xf9,0x48,0x8b,0x1d,0x8d,0xe2,0x9a,0x02,0x45,0x8b,0xe0,0x0f,0x84};
     if(output)memset(output,0,sizeof(*output));
     if(!source || !work || !output || !uss_sdk_compatible(source->api) || !source->mod ||
         !source->api->read || !source->api->build_id || !source->api->module_base || !source->api->session || !source->api->game_state ||
         !source->platform.thread_id || source->platform.thread_id(source->platform.user)!=work->owner.thread ||
         !source->policy || !source->policy->known || !source->policy->eligible || source->policy->disabled ||
-        source->policy->suspended || source->policy->paused || source->policy->input)return 0;
-    build=source->api->build_id();if(!build || strcmp(build,"25480438"))return 0;
+        source->policy->suspended || source->policy->paused || source->policy->input){
+        /* Missing contract pieces and a different thread never improve by waiting; a blocked policy is a state that can clear. */
+        if(output && (!source || !source->api || !source->mod || !source->platform.thread_id || !work ||
+            source->platform.thread_id(source->platform.user)!=work->owner.thread))output->refusal=USS_RECOVERY_REFUSAL_CONTRACT;
+        return 0;
+    }
+    build=source->api->build_id();if(!build || strcmp(build,"25480438")){output->refusal=USS_RECOVERY_REFUSAL_CONTRACT;return 0;}
     memory.api=source->api;memory.slot=-1;
     if(!core_scope(&memory,source->api,source->mod,&before) || !before.mission ||
-        !inventory_sample(&memory,&result.inventory) || !recovery_snapshot_context(work,&before,&result.inventory) ||
-        !get(&memory,before.game+0x978ac0,pin,32) || memcmp(pin,member_pin,32))return 0;
+        !inventory_sample(&memory,&result.inventory))return 0;
+    if(!recovery_snapshot_context(work,&before,&result.inventory)){output->refusal=USS_RECOVERY_REFUSAL_CONTEXT_CHANGED;return 0;}
+    if(!get(&memory,before.game+USS_MEMBER_PIN_RVA,pin,USS_MEMBER_PIN_BYTES))return 0;
+    if(!uss_member_pin_matches(pin)){output->refusal=USS_RECOVERY_REFUSAL_CONTRACT;return 0;}
     result.death=!publication_id(result.inventory.slots[0]) || !publication_id(result.inventory.slots[1]);
     result.all_empty=result.inventory.slots[0]==0 && result.inventory.slots[1]==0 && result.inventory.slots[2]==0 && result.inventory.slots[3]==0;
-    if(!result.death && result.inventory.slots[2]!=0 && result.inventory.slots[2]!=work->survivor.entity)return 0;
-    if(!recovery_member(&memory,before.game,&result.inventory,&work->survivor,&result.survivor,&survivor_absent) || survivor_absent ||
-        !recovery_member(&memory,before.game,&result.inventory,&work->outgoing,&result.outgoing,&result.outgoing_absent))return 0;
+    if(!result.death && result.inventory.slots[2]!=0 && result.inventory.slots[2]!=work->survivor.entity){output->refusal=USS_RECOVERY_REFUSAL_CONTEXT_CHANGED;return 0;}
+    if(!recovery_member(&memory,before.game,&result.inventory,&work->survivor,&result.survivor,&survivor_absent))return 0;
+    if(survivor_absent){output->refusal=USS_RECOVERY_REFUSAL_SURVIVOR_ABSENT;return 0;} /* a CLEAN empty bucket, never a failed read */
+    if(!recovery_member(&memory,before.game,&result.inventory,&work->outgoing,&result.outgoing,&result.outgoing_absent))return 0;
     if(!result.death){
         if(!primary_fields(&memory,before.game,&result.inventory,&result.primary.fields))return 0;
         primary_predicate(&result.primary,&result.inventory);result.primary.valid=1;

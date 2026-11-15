@@ -34,17 +34,24 @@ static inline int player_sdk_scope(UssPlayerInputSdk* source)
 }
 /* Chat and escape-stack fields are the same read-only layout used by Lua's
  * dedicated input. Two equal samples bind a result to the current UI instance. */
-static inline int player_sdk_ui(UssPlayerInputSdk* source,unsigned* clear)
+/* The same reads and the same result as before; chat/escape are also reported separately, from bytes already read, so a
+ * block can be attributed without another read. A failed or incoherent read returns 0 and leaves both flags 0 (unknown). */
+static inline int player_sdk_ui_detail(UssPlayerInputSdk* source,unsigned* clear,unsigned* chat_active,unsigned* escape_active)
 {
     Reader memory={0};uintptr_t ui=0,again_ui=0;unsigned char chat[8],again_chat[8],stack[24],again_stack[24];
-    uint32_t depth;memory.api=source->api;memory.slot=-1;
+    uint32_t depth;unsigned chat_now,escape_now;memory.api=source->api;memory.slot=-1;
+    if(chat_active)*chat_active=0;if(escape_active)*escape_active=0;
     if(!get_ptr(&memory,source->base+0x347ce28,&ui) || !get(&memory,ui+0x10,chat,8) ||
         !get(&memory,ui+0x429c,stack,24) || !get(&memory,ui+0x10,again_chat,8) || memcmp(chat,again_chat,8) ||
         !get(&memory,ui+0x429c,again_stack,24) || memcmp(stack,again_stack,24) ||
         !get_ptr(&memory,source->base+0x347ce28,&again_ui) || ui!=again_ui)return 0;
     depth=u32(stack+20);
-    *clear=ptr_value(chat)==0 && !(depth>=1 && depth<=5 && u32(stack)==1);return 1;
+    chat_now=ptr_value(chat)!=0;escape_now=depth>=1 && depth<=5 && u32(stack)==1;
+    *clear=!chat_now && !escape_now;
+    if(chat_active)*chat_active=chat_now;if(escape_active)*escape_active=escape_now;return 1;
 }
+static inline int player_sdk_ui(UssPlayerInputSdk* source,unsigned* clear)
+{return player_sdk_ui_detail(source,clear,NULL,NULL);}
 /* Real readiness is produced here, never copied from a diagnostic setup flag.
  * Down/empty-inventory handling remains a post-Core recovery concern; ordinary
  * action services independently require both standard weapons and valid held
@@ -52,6 +59,7 @@ static inline int player_sdk_ui(UssPlayerInputSdk* source,unsigned* clear)
 static inline int uss_player_sdk_policy(void* user,UssCoreFlags* flags)
 {
     UssPlayerInputSdk* source=(UssPlayerInputSdk*)user;unsigned clear=0;uint32_t state;
+    if(source)source->reason="PLAYER_POLICY_UNKNOWN"; /* Never reuse stale UI attribution as idle-deferral authority. */
     if(flags)memset(flags,0,sizeof(*flags));
     if(!flags || !player_sdk_scope(source))return 0;
     state=source->api->game_state(source->mod);
@@ -63,10 +71,14 @@ static inline int uss_player_sdk_policy(void* user,UssCoreFlags* flags)
          * previous actor's gameplay was paused. No native work runs outside. */
         flags->known=flags->eligible=1;flags->paused=0;return 1;
     }
-    if(!source->foreground || !source->foreground(source->input_user) || source->binding_capture ||
-        !player_sdk_ui(source,&clear) || !clear){
-        source->settings->release_required=1;source->reason="PLAYER_UI_OR_FOCUS_BLOCKED";return 0;
-    }
+    /* Same short-circuit order as the single condition this replaced. Only branches that actually ran are named: a branch
+     * not reached stays unknown. A failed UI read is UI_READ_UNKNOWN, never CHAT or ESCAPE. */
+    {const char* blocked=NULL;unsigned chat=0,escape=0;
+     if(!source->foreground || !source->foreground(source->input_user))blocked="PLAYER_NOT_FOREGROUND";
+     else if(source->binding_capture)blocked="PLAYER_BINDING_CAPTURE";
+     else if(!player_sdk_ui_detail(source,&clear,&chat,&escape))blocked="PLAYER_UI_READ_UNKNOWN";
+     else if(!clear)blocked=chat?"PLAYER_CHAT_ACTIVE":"PLAYER_ESCAPE_ACTIVE";
+     if(blocked){source->settings->release_required=1;source->reason=blocked;return 0;}}
     flags->known=flags->eligible=1;source->reason="PLAYER_POLICY_CURRENT";return 1;
 }
 static inline int uss_player_sdk_sample(void* user,const UssCoreObservation* current,UssPlayerInputSample* output)

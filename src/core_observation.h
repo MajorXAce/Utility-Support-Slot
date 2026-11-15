@@ -4,6 +4,7 @@
 #define USS_CORE_OBSERVATION_H
 #include "pair_owner.h"
 #include "publication_capture.h"
+#include "uss_member_pin.h"
 #include "pair_member.h"
 #include "utility_lineage.h"
 
@@ -32,34 +33,41 @@ typedef struct UssCorePlatform {
     uint32_t (*thread_id)(void*);
 } UssCorePlatform;
 
+/* Log-only: name the sub-check of core_scope that refused (Reader.detail). Returns 0 so a caller can write return core_refuse(...). */
+static int core_refuse(Reader* memory,const char* detail){memory->detail=detail;return 0;}
 static int core_scope(Reader* memory,const HfApi* api,HfMod* mod,UssCoreScope* scope)
 {
     HfSession session={0};UssCaptureReader reader={0};unsigned char pin[7];
     static const unsigned char state_pin[7]={0x48,0x8b,0x0d,0x15,0x23,0x1e,0x03};
     memset(scope,0,sizeof(*scope));scope->sdk_state=api->game_state(mod);
-    if(scope->sdk_state<HF_STATE_SPLASH || scope->sdk_state>HF_STATE_PREPARE_MISSION)return 0;
+    if(scope->sdk_state<HF_STATE_SPLASH || scope->sdk_state>HF_STATE_PREPARE_MISSION)return core_refuse(memory,"SDK_STATE");
     api->session(mod,&session);scope->role=session.role;scope->version=session.version;
     scope->game=api->module_base("game.dll",&scope->game_size);memory->stage="CORE_SCOPE";
-    if(!scope->game || scope->game_size<0x3484570 || scope->game_size>0x20000000 ||
-        !address_ok(scope->game,scope->game_size) ||
-        !get(memory,scope->game+0x144024,pin,7) || memcmp(pin,state_pin,7) ||
-        !get_ptr(memory,scope->game+0x3326340,&scope->state) ||
-        !get_ptr(memory,scope->game+0x33266A0,&scope->mode) ||
-        !get(memory,scope->state+0xAC21C,&scope->state_value,4) ||
-        !get(memory,scope->mode+8,&scope->mode_value,4))return 0;
+    /* Same checks, same order and same reads as the single combined test this replaced; each refusal now names itself. */
+    if(!scope->game)return core_refuse(memory,"MODULE_BASE");
+    if(scope->game_size<0x3484570 || scope->game_size>0x20000000 || !address_ok(scope->game,scope->game_size))
+        return core_refuse(memory,"MODULE_SIZE");
+    if(!get(memory,scope->game+0x144024,pin,7))return core_refuse(memory,"STATE_PIN_READ");
+    if(memcmp(pin,state_pin,7))return core_refuse(memory,"STATE_PIN_BYTES");
+    if(!get_ptr(memory,scope->game+0x3326340,&scope->state))return core_refuse(memory,"STATE_POINTER");
+    if(!get_ptr(memory,scope->game+0x33266A0,&scope->mode))return core_refuse(memory,"MODE_POINTER");
+    if(!get(memory,scope->state+0xAC21C,&scope->state_value,4))return core_refuse(memory,"STATE_VALUE");
+    if(!get(memory,scope->mode+8,&scope->mode_value,4))return core_refuse(memory,"MODE_VALUE");
     scope->mission=scope->state_value==4 && scope->mode_value==1;
-    if(scope->mission!=(unsigned)(scope->sdk_state==HF_STATE_MISSION))return 0;
+    if(scope->mission!=(unsigned)(scope->sdk_state==HF_STATE_MISSION))return core_refuse(memory,"MISSION_MISMATCH");
     if(!scope->mission)return 1; /* Confirmed outside, not an inventory read failure. */
-    if((scope->role!=HF_SESSION_SOLO && scope->role!=HF_SESSION_HOST && scope->role!=HF_SESSION_JOINER) ||
-        !get_ptr(memory,scope->game+0x347CEF0,&scope->session) ||
-        !get_ptr(memory,scope->game+0x346BF98,&scope->mapping))return 0;
+    if(scope->role!=HF_SESSION_SOLO && scope->role!=HF_SESSION_HOST && scope->role!=HF_SESSION_JOINER)
+        return core_refuse(memory,"SESSION_ROLE");
+    if(!get_ptr(memory,scope->game+0x347CEF0,&scope->session))return core_refuse(memory,"SESSION_POINTER");
+    if(!get_ptr(memory,scope->game+0x346BF98,&scope->mapping))return core_refuse(memory,"MAPPING_POINTER");
     reader.memory=*memory;
     {int ok=capture_peers(&reader,scope->session,&scope->peers);*memory=reader.memory;
-        if(!ok)return 0;
+        if(!ok)return 0; /* capture_peers already named the failing peer check */
         scope->local_only=scope->peers.count==1;
         if(scope->local_only){
-            if(scope->role==HF_SESSION_JOINER || !scope->peers.is_host)return 0;
-        }else if(scope->role==HF_SESSION_SOLO || scope->peers.is_host!=(unsigned)(scope->role==HF_SESSION_HOST))return 0;}
+            if(scope->role==HF_SESSION_JOINER || !scope->peers.is_host)return core_refuse(memory,"PEER_ROLE_LOCAL");
+        }else if(scope->role==HF_SESSION_SOLO || scope->peers.is_host!=(unsigned)(scope->role==HF_SESSION_HOST))
+            return core_refuse(memory,"PEER_ROLE_REMOTE");}
 
     return 1;
 }
@@ -132,7 +140,6 @@ static UssCoreObservation core_observe_extended(const HfApi* api,HfMod* mod,cons
     UssCoreCandidateNames names={0};
     UssMemberEvidence named_before[USS_CORE_CANDIDATE_CAP]={{0}},named_after[USS_CORE_CANDIDATE_CAP]={{0}};
     static const unsigned char action_pin[7]={0x4c,0x8b,0x35,0x4c,0x2e,0x89,0x02};
-    static const unsigned char member_pin[32]={0x40,0x53,0x41,0x54,0x41,0x57,0x48,0x83,0xec,0x20,0x3b,0x15,0x50,0xb1,0xb0,0x02,0x45,0x0f,0xb6,0xf9,0x48,0x8b,0x1d,0x8d,0xe2,0x9a,0x02,0x45,0x8b,0xe0,0x0f,0x84};
     memory.api=api;memory.slot=-1;memory.stage="CORE_CONTRACT";
     if(named)memset(named,0,sizeof(*named));
     if(requested){names=*requested;if(!named || !core_candidate_names_valid(owner,&names)){memory.failure="CANDIDATE_NAMES";goto done;}}
@@ -152,19 +159,27 @@ static UssCoreObservation core_observe_extended(const HfApi* api,HfMod* mod,cons
         if(!core_scope(&memory,api,mod,&after) || memcmp(&before,&after,sizeof(before)))goto done;
         candidate.valid=1;goto accepted;
     }
+    memory.stage="CORE_FLAGS";
     if(!flags || !flags->known)goto done;
     uss_support_lineage_scan_once(api,mod); /* once per session, only after a mission has begun */
     candidate.flags=*flags;candidate.mission=1;
     memory.stage="CORE_INVENTORY";
-    if(!inventory_sample(&memory,&inventory) ||
-        !get(&memory,before.game+0xA93ECD,pin,7) || memcmp(pin,action_pin,7) ||
-        !primary_fields(&memory,before.game,&inventory,&primary_before) || primary_before.game_state!=before.state)goto done;
+    if(!inventory_sample(&memory,&inventory))goto done;
+    memory.stage="CORE_ACTION_PIN";
+    if(!get(&memory,before.game+0xA93ECD,pin,7) || memcmp(pin,action_pin,7))goto done;
+    memory.stage="CORE_PRIMARY_BEFORE";
+    if(!primary_fields(&memory,before.game,&inventory,&primary_before))goto done;
+    memory.stage="CORE_PRIMARY_STATE";
+    if(primary_before.game_state!=before.state)goto done;
     candidate.context=core_context(&inventory,&before);
     if(requested && !pair_owner_context_equal(&candidate.context,&names.context)){memory.failure="CANDIDATE_CONTEXT";goto done;}
     candidate.pair_matched=owner->pair_present && owner->context_valid &&
         pair_owner_context_equal(&candidate.context,&owner->context);
-    if((candidate.pair_matched || requested) &&
-        (!get(&memory,before.game+0x978AC0,pin,32) || memcmp(pin,member_pin,32)))goto done;
+    if(candidate.pair_matched || requested){
+        memory.stage="CORE_MEMBER_PIN"; /* a refusal here used to carry the stale stage CORE_PRIMARY_STATE */
+        if(!get(&memory,before.game+USS_MEMBER_PIN_RVA,pin,USS_MEMBER_PIN_BYTES)){memory.detail="MEMBER_PIN_READ";goto done;}
+        if(!uss_member_pin_matches(pin)){memory.detail="MEMBER_PIN_BYTES";goto done;}
+    }
     if(candidate.pair_matched) {
         if(!member_fields(&memory,before.game,&inventory,owner->utility.entity,owner->utility.identity,&utility_before) ||
             !member_fields(&memory,before.game,&inventory,owner->ordinary.entity,owner->ordinary.identity,&ordinary_before) ||
@@ -178,7 +193,10 @@ static UssCoreObservation core_observe_extended(const HfApi* api,HfMod* mod,cons
             memory.diag_native_kind=named_before[i].native_kind;memory.diag_effective_kind=named_before[i].kind;
             memory.failure="CANDIDATE_CLASS";goto done;}
     }
-    if(!primary_fields(&memory,before.game,&inventory,&primary_after) || memcmp(&primary_before,&primary_after,sizeof(primary_before)))goto done;
+    memory.stage="CORE_PRIMARY_AFTER";
+    if(!primary_fields(&memory,before.game,&inventory,&primary_after))goto done;
+    memory.stage="CORE_PRIMARY_CHANGED";
+    if(memcmp(&primary_before,&primary_after,sizeof(primary_before)))goto done;
     if(candidate.pair_matched &&
         (!member_fields(&memory,before.game,&inventory,owner->utility.entity,owner->utility.identity,&utility_after) ||
          !member_fields(&memory,before.game,&inventory,owner->ordinary.entity,owner->ordinary.identity,&ordinary_after) ||
@@ -189,8 +207,13 @@ static UssCoreObservation core_observe_extended(const HfApi* api,HfMod* mod,cons
         else if(!member_fields(&memory,before.game,&inventory,names.members[i].entity,names.members[i].identity,&named_after[i]))goto done;
         if(memcmp(&named_before[i],&named_after[i],sizeof(named_before[i]))){memory.failure="CANDIDATE_CHANGED";goto done;}
     }
-    if(!inventory_sample(&memory,&final_inventory) || memcmp(&inventory,&final_inventory,sizeof(inventory)) ||
-        !core_scope(&memory,api,mod,&after) || memcmp(&before,&after,sizeof(before)))goto done;
+    memory.stage="CORE_INVENTORY_AFTER";
+    if(!inventory_sample(&memory,&final_inventory))goto done;
+    memory.stage="CORE_INVENTORY_CHANGED";
+    if(memcmp(&inventory,&final_inventory,sizeof(inventory)))goto done;
+    if(!core_scope(&memory,api,mod,&after))goto done;
+    memory.stage="CORE_SCOPE_CHANGED";
+    if(memcmp(&before,&after,sizeof(before)))goto done;
     candidate.inventory=inventory;candidate.primary.fields=primary_after;
     primary_predicate(&candidate.primary,&inventory);candidate.primary.valid=1;
     candidate.utility=utility_after;candidate.ordinary=ordinary_after;

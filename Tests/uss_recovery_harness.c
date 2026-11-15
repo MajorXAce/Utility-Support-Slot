@@ -102,6 +102,18 @@ int USS_RECOVERY_TEST_MAIN(void)
     recovery_scene(1,1,HF_SESSION_HOST);empty_support(0,1);
     assert(recovery_update()==USS_CONTROL_WORK);
     assert(uss_recovery_observe(&recovery.native.reader,&recovery.work,&snapshot));
+    /* The recovery reader compares every byte of the shared member pin (game.dll+0x978AC0) too. Each flipped byte must refuse at
+     * the same read, earlier than an accepted observation reads, and restoring the byte must restore the accepted read count. */
+    {unsigned byte,refused_reads=0,accepted_reads;unsigned char* pin_bytes=fixture(BASE+0x978ac0,32);
+        reads=0;assert(uss_recovery_observe(&recovery.native.reader,&recovery.work,&snapshot));accepted_reads=reads;
+        for(byte=0;byte<32;++byte){
+            pin_bytes[byte]^=0x40;reads=0;
+            assert(!uss_recovery_observe(&recovery.native.reader,&recovery.work,&snapshot) && !snapshot.valid);
+            if(!byte)refused_reads=reads;
+            assert(reads==refused_reads && reads<accepted_reads);
+            pin_bytes[byte]^=0x40;
+        }
+        reads=0;assert(uss_recovery_observe(&recovery.native.reader,&recovery.work,&snapshot) && reads==accepted_reads);}
     put32(fixture(snapshot.primary.fields.action.record,32)+28,1);
     replacement_now+=25;assert(recovery_update()==USS_CONTROL_WORK);
     assert(!strcmp(recovery.work.reason,"WAIT_RECOVERY_RESTORE_READY") && !recovery_effects && !recovery.work.consumed);

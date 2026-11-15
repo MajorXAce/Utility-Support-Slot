@@ -8,68 +8,81 @@ This is the HellForge version. The original Lua version is preserved on the
 [legacy branch](https://github.com/MajorXAce/Utility-Support-Slot/tree/legacy)
 and in the older releases.
 
-## Installation and requirements
+## Installation and Requirements
 
 Requires [HellForge](https://github.com/SkyeShade/HellForge) on game build
-**25480438**, with mod SDK **11 or newer**. Import the release ZIP through
-HellForge's mod manager and enable **Utility Support Slot**, then restart.
-This package is for HellForge, not the current live game.
+**25480438**, with mod SDK **11 or newer**. Import the ZIP through
+HellForge's mod manager and enable **Utility Support Slot**. Start or restart the
+game through HellForge's launcher.
+This mod only works for HellForge, not the current live game.
 
-Remove any older USS test build or Lua copy from the same setup before enabling
+Remove any older USS test build or Lua version from the same setup before enabling
 this version. They should not run together.
 
-The C **Mod Options Menu** and **Mod Bindings Menu**, included in CowboyBingus's
-HellForge Vanilla Plus Megapack, are optional. Integration currently supports
-Megapack **0.2.1**. Without both working menus, USS uses its own menu instead.
+The **Mod Options Menu** and **Mod Bindings Menu**, included in CowboyBingus's
+HellForge Vanilla Plus Megapack, are optional. If either is unavailable, USS uses
+its own menu instead.
 
 ## Controls
 
-**Default:** press your support binding while your support weapon is already
-drawn to swap the pair. On controller, hold the weapon-switch button while
-support is drawn.
+**Default:** press your support weapon key while holding a support weapon to
+swap the pair. On controller, hold the weapon-switch button instead.
 
-**Dedicated:** use **Utility Weapon** to draw the utility directly. Pressing it
-again leaves the utility drawn, like vanilla. Other weapon controls behave as
-normal. A lone utility can also be drawn with the normal support control.
+**Dedicated:** use **Utility Weapon** to draw the utility directly. Other weapon
+controls behave as normal. If you only have a utility, the normal support weapon
+control also works.
 
-Without the optional menus, open **Options > USS** to choose Binding Mode and
-assign Utility Weapon. The standalone default is **6**; the assignment accepts
-keyboard or controller input.
+Without the optional menu mods, open **Options > USS** to choose Binding Mode and
+assign a key or controller button to Utility Weapon. The default is **6**.
 
-With the optional menus, choose **Binding Mode** under
+With the optional menu mods, choose **Binding Mode** under
 **Options > MODS > Utility Support Slot** and press **APPLY**. Assign
 **Utility Weapon** under **Utility Support Slot** on the keyboard/controller
-binding pages. That external binding starts unbound. Release the control after
-changing modes before using it again.
+binding pages. You need to assign a control there before using Dedicated mode.
+Release the control after changing modes before using it again.
 
-The external menus save their own choices. Your standalone choices are kept
-separately and are used again if the external menus are unavailable.
+The menu mods save their settings separately from USS's own menu. If you remove
+them, USS goes back to the settings you used in its own menu.
 
-## Pickup and recovery
+## Pickup and Recovery
 
-Pickups follow the game's **Switch Weapon On Pickup** setting. With **No**, your
-previously selected weapon is restored; replacing an already drawn utility keeps
-the new utility drawn. Replacing either weapon keeps the other one and drops the
-old weapon like vanilla. Dropping or expending one weapon restores the remaining
-weapon. Dying drops both weapons like vanilla.
+Pickups follow the game's **Switch Weapon On Pickup** setting. With **No**, you
+keep using your previous weapon. If you replace a utility while holding it, the
+new utility stays drawn.
 
-## Known limitations and multiplayer support
+Replacing one weapon keeps the other and drops the old one. Dropping or expending
+one weapon makes the remaining weapon available again. Dying drops both weapons
+like vanilla.
 
-The game still has one support slot. The mod tracks the other weapon separately
-and keeps it attached to your character.
+## Known Limitations and Multiplayer Support
 
 Hosting and joining have been tested with two computers. More players are welcome
 to try it and report issues.
 
-- A brief switch through your primary weapon can be visible during handling.
+- Your primary weapon may briefly appear during weapon changes.
 - Players joining mid-mission may not see your stored weapon until you swap weapons.
 - Resupplying from another player's supply backpack does not refill the stored weapon.
 - Leaving a mission with a pair may lose the stored weapon.
 - Mods that change support weapon pickup or inventory slots can conflict with USS.
+- USS is currently incompatible with 8 Player Mod, even when playing solo.
+- If a Silo pod is destroyed while its remote is stored, a ghost remote can remain
+  attached until you die. It is a visual bug and shouldn't affect gameplay.
+
+## Bug reports
+
+If something goes wrong, describe what happened and attach the USS log. Include
+your USS and HellForge versions, binding mode (Default or Dedicated), whether you
+use a keyboard or controller, the weapons involved, whether you were hosting or
+joining, and any other mods you use.
+
+Open your HellForge folder, then **logs > sessions**. Open the folder for the
+session where it happened and attach **mod-majorxace.utility-support-slot.log**.
+If you are unsure which session to use, choose the newest folder. The log is in
+that session folder, not in the mod's folder.
 
 ## Building
 
-Source and offline checks are included. See [BUILDING.md](BUILDING.md).
+If you want to build the mod yourself, see [BUILDING.md](BUILDING.md).
 
 ## License
 

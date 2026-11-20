@@ -10,13 +10,16 @@ typedef struct UssMenuSessionNode {
     UssMenuSdkWriter writer;
     UssMenuLifetime menu;
 } UssMenuSessionNode;
+/* Native callbacks may retain old descriptors: do not free/recycle them without
+ * a proved release contract. Bound retained storage instead of growing forever. */
+enum {USS_MENU_SESSION_MAX_BYTES=16*1024*1024,USS_MENU_SESSION_MAX_LIFETIMES=256};
 typedef struct UssMenuSession {
     UssMenuSessionNode* retained;
     UssMenuSessionNode* current;
     void* allocation_user;
     void* (*allocate)(void*,size_t); /* NEW zeroed memory; no recycling. */
     uint64_t count;
-    unsigned stopped;
+    unsigned stopped,storage_limited;
 } UssMenuSession;
 static inline void* uss_menu_session_heap(void* user,size_t size)
 {(void)user;return HeapAlloc(GetProcessHeap(),HEAP_ZERO_MEMORY,size);}
@@ -39,7 +42,11 @@ static inline int uss_menu_session_prepare_node(UssMenuSessionNode* node,
 static inline UssMenuSessionNode* uss_menu_session_allocate(UssMenuSession* session,const UssMenuSdkContext* context)
 {
     UssMenuSessionNode* node;
-    if(!session || session->stopped || session->current || !context || !session->allocate || session->count==UINT64_MAX)return NULL;
+    if(!session || session->stopped || session->current || !context || !session->allocate)return NULL;
+    if(session->count>=USS_MENU_SESSION_MAX_LIFETIMES ||
+       session->count>=USS_MENU_SESSION_MAX_BYTES/sizeof(UssMenuSessionNode)){
+        session->stopped=1;session->storage_limited=1;return NULL;
+    }
     node=(UssMenuSessionNode*)session->allocate(session->allocation_user,sizeof(*node));
     if(!node){session->stopped=1;return NULL;}
     /* The allocator's explicit contract is zeroed storage. Keep even refused

@@ -1,8 +1,17 @@
 #include <assert.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include "../src/normal_gameplay.c"
-static unsigned logs,module_calls;
-static void own_log(HfMod* mod,const char* format,...){assert(mod==(HfMod*)1);assert(format);++logs;}
+static unsigned logs,module_calls,provider_logs,ui_logs,bootstrap_logs,callback_logs;
+static void own_log(HfMod* mod,const char* format,...)
+{
+ char line[1024];va_list args;assert(mod==(HfMod*)1);assert(format);++logs;
+ va_start(args,format);vsnprintf(line,sizeof line,format,args);va_end(args);
+ if(strstr(line,"USS menu provider:"))++provider_logs;
+ if(strstr(line,"USS menu UI:"))++ui_logs;
+ if(strstr(line,"USS menu bootstrap status="))++bootstrap_logs;
+ if(strstr(line,"USS menu callback active;"))++callback_logs;
+}
 static const char* own_build(void){assert(0);return NULL;}
 static uintptr_t own_module(const char* name,size_t* size){assert(!strcmp(name,"game.dll"));++module_calls;*size=0;return 0;}
 static unsigned provider_ready=1,provider_options,provider_bindings;
@@ -45,8 +54,10 @@ int main(void){HfApi api={0};api.version=12;api.size=sizeof(api);api.log=own_log
  assert(hellforge_mod_init(&api,(HfMod*)1)==1 && logs==1);
  api.module_base=own_module;normal.app.native.api=&api;normal.app.native.mod=(HfMod*)1;
  uss_settings_init(&normal.app.settings,NULL);logs=0;
- {unsigned i;for(i=0;i<20;++i){normal.next_menu_check=0;normal_menu_frame(&normal,0.016f,&normal.app.settings,0);}}
- assert(logs==2 && normal.bootstrap_reports==1 && module_calls==20);
+ {unsigned i,first=0;for(i=0;i<20;++i){normal.next_menu_check=0;normal_menu_frame(&normal,0.016f,&normal.app.settings,0);
+   if(!i)first=logs;else assert(logs==first);}}
+ assert(provider_logs==1 && ui_logs==1 && bootstrap_logs==1 && callback_logs==1);
+ assert(normal.bootstrap_reports==1 && module_calls==20);
  assert(!strcmp(normal.bootstrap_checkpoint,"ARGUMENTS") && normal.bootstrap_status==1 && !normal.menus.retained);
  /* Reports software transitions once, never reads code or performs effects.
   * A new pause is still visible after the progress-log quota is exhausted. */

@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "implementation": "HellForge C",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "files": {
     ".gitattributes": {
       "source": "PublicRelease/.gitattributes",
@@ -9,7 +9,7 @@
     },
     ".github/workflows/player-release.yml": {
       "source": "PublicRelease/.github/workflows/player-release.yml",
-      "sha256": "ac302dac56e7348576f3e4076e719f09ca1dca35f95701471ea2fb77325765dc"
+      "sha256": "c5d3503c755b8a91f57b2542145f4e37af13a33dac4427a04ec415199db781d3"
     },
     ".gitignore": {
       "source": "PublicRelease/.gitignore",
@@ -19,13 +19,21 @@
       "source": "PublicRelease/BUILDING.md",
       "sha256": "bfe8524c68e357de834af2df6aae40954f153bc3a57e3a4c210cb9d086bf751d"
     },
+    "COMPANION.md": {
+      "source": "PublicRelease/COMPANION.md",
+      "sha256": "1cee001b44e8e01a99ca8af3843e4e3714bacc7cdf548c8a0d29e2525473949a"
+    },
+    "Companion/uss_lua_menu_bridge.lua": {
+      "source": "Companion/uss_lua_menu_bridge.lua",
+      "sha256": "e63593929f2cbcd55a1c0d89bf1c5e1773c065167e07790c1c1c2ba6c86dad9c"
+    },
     "LICENSE": {
       "source": "PublicRelease/LICENSE",
       "sha256": "5c7a9885a99192833a9b11a5a3085487b4c68f4a6af0ee14775eaaebc679b933"
     },
     "README.md": {
       "source": "PublicRelease/README.md",
-      "sha256": "2a5c6a01df82bb489ad4316772e3b6a614c52e266f854742b35d737628c5de22"
+      "sha256": "1a8ac8f9f7b92d5cab7569d65abd4bc076b9c8904472076bf4ee2c5b24711a0b"
     },
     "ResearchSource/capture_probe.c": {
       "source": "ResearchSource/capture_probe.c",
@@ -107,9 +115,17 @@
       "source": "Tests/inventory_harness.c",
       "sha256": "73f19642c10abb55f6af941836065d17e6ef4e4485efe6cc47e0cada39fecb67"
     },
+    "Tests/menu_first_use_harness.c": {
+      "source": "Tests/menu_first_use_harness.c",
+      "sha256": "07a1c89bfa829f2f158e2a99dd52b1c5215458fd1bb89333cb6ed40cde4bbb5f"
+    },
     "Tests/native_calls_harness.c": {
       "source": "Tests/native_calls_harness.c",
       "sha256": "4f578bbf9dbab268d591b0fff13281bc99e8131d106c4886ca9ede2f31398426"
+    },
+    "Tests/normal_menu_presence_harness.c": {
+      "source": "Tests/normal_menu_presence_harness.c",
+      "sha256": "9f3ef26d4597375b66ca096e53531056e32bb040eb0fde1189a7f4c942c6c85e"
     },
     "Tests/pair_member_harness.c": {
       "source": "Tests/pair_member_harness.c",
@@ -255,6 +271,10 @@
       "source": "Tests/uss_hud_windows_harness.c",
       "sha256": "7583e37cb06c5ca200aa707ceca598dda00fc7eab64e616606426aa98dc8ff8b"
     },
+    "Tests/uss_lua_menu_bridge_harness.c": {
+      "source": "Tests/uss_lua_menu_bridge_harness.c",
+      "sha256": "374fd074388ed8fb7560473d8ab7d46c27db5ecebefd4df1c91f806b9bc18361"
+    },
     "Tests/uss_menu_capture_guard_harness.c": {
       "source": "Tests/uss_menu_capture_guard_harness.c",
       "sha256": "4222117fc2e12b5219510666ed27068f1b81ee31ebc23e30a293a1adf53f4197"
@@ -341,7 +361,7 @@
     },
     "Tests/uss_native_menu_session_harness.c": {
       "source": "Tests/uss_native_menu_session_harness.c",
-      "sha256": "7a9682d7202e91dced58f48be5c0c808498d446ed88b25ad2f84deb0b1c7fc69"
+      "sha256": "911db9f4d30bfbaaa2aff8b4b225f2e717d23902addccd18a1f90c6a4793568f"
     },
     "Tests/uss_native_menu_write_harness.c": {
       "source": "Tests/uss_native_menu_write_harness.c",
@@ -349,7 +369,7 @@
     },
     "Tests/uss_normal_startup_harness.c": {
       "source": "Tests/uss_normal_startup_harness.c",
-      "sha256": "7b7e659198b7ad462cb41e8543c87fa709e2b792744bb6c8f50341ae80dd1a8e"
+      "sha256": "5f65241ceca253e7a6e14135dca42260bf85252e57e12e1aa11f0e3837b99548"
     },
     "Tests/uss_pickup_completion_harness.c": {
       "source": "Tests/uss_pickup_completion_harness.c",
@@ -463,9 +483,13 @@
       "source": "PublicRelease/Tools/build.py",
       "sha256": "7dbd9acb149d4680efa6e4d72e4aba43cfbbace23df76f0acb5020f47577b3c6"
     },
+    "Tools/build_companion.py": {
+      "source": "PublicRelease/Tools/build_companion.py",
+      "sha256": "057239373f1a0dc3b7a97cd8e37f0d411288f6a80ef1f2f53f96aaa8f2fde081"
+    },
     "Tools/check_current.py": {
       "source": "PublicRelease/Tools/check_current.py",
-      "sha256": "c98e6081ea2c4e2524184e89f5b359e70ebe87a03aaa63fd66f9a9143be75851"
+      "sha256": "8e22639715b648c69f1cb6665574c211c55cf465058144e0b53041a86a5d738c"
     },
     "Tools/sdk_baseline.json": {
       "source": "PublicRelease/Tools/sdk_baseline.json",
@@ -477,11 +501,11 @@
     },
     "VERSION": {
       "source": "PublicRelease/VERSION",
-      "sha256": "ceb9b2c03afb769df3b1e518520c4e1798e9a3313a1c5ffffcb054fef5d6d6fb"
+      "sha256": "780363b8ef02ff7e83eb72709f6396b09dec21a26403bb44f58ea8d6757fe33d"
     },
     "hellforge-mod.json": {
       "source": "PublicRelease/hellforge-mod.json",
-      "sha256": "7f00a5704fea48f377f0b96750f976a3445b774cd56b47a51c58acae1ea5633a"
+      "sha256": "2a346fa78026bc0ca4e17c85f85826ee88ca221c05e6430690b8520d8ee9c3b5"
     },
     "icon.png": {
       "source": "PublicRelease/icon.png",
@@ -489,7 +513,7 @@
     },
     "release_notes.md": {
       "source": "PublicRelease/release_notes.md",
-      "sha256": "5154f368ff0dc733d30569ce65f648dccb10cc51feab24378ea456b1e333f80d"
+      "sha256": "7ff86f3c4b5de763dde86089ce6aef0c9e9edd90115d26172c1b272df73ba6df"
     },
     "src/action_state.h": {
       "source": "src/action_state.h",
@@ -565,7 +589,7 @@
     },
     "src/normal_gameplay.c": {
       "source": "src/normal_gameplay.c",
-      "sha256": "9de302d2719cce93ad879483e2e2007679f31cfeb393765f2e2f0d30639ff6a6"
+      "sha256": "70e73787ef43f0dd900184b3866887fcb393225faf7a9f5c03d1eb891e94c8c2"
     },
     "src/pair_member.h": {
       "source": "src/pair_member.h",
@@ -719,13 +743,33 @@
       "source": "src/uss_hud_windows.h",
       "sha256": "bb6c80738164c2f230e438aac1382d66b0b32210e824a214ddac74fbad5935c8"
     },
+    "src/uss_lua_menu_mailbox.h": {
+      "source": "src/uss_lua_menu_mailbox.h",
+      "sha256": "e6f0e4f5ef2e09a2d874922f04be6bd90bf7ec168a39914f6bd8bc04e4fb6df7"
+    },
     "src/uss_member_pin.h": {
       "source": "src/uss_member_pin.h",
       "sha256": "1245822499b585869c3df183ebfb7efe7a8160169deb99faab79478a5436df6f"
     },
+    "src/uss_menu_arbiter.h": {
+      "source": "src/uss_menu_arbiter.h",
+      "sha256": "a8b1a96b172653c804858af5a1255682698ac3d33533fde95bf043ecd881cd8c"
+    },
     "src/uss_menu_capture_guard.h": {
       "source": "src/uss_menu_capture_guard.h",
       "sha256": "38018126599f7b4bb4dec380fc8302a72c912a30d031b3d02de436b315ea22ae"
+    },
+    "src/uss_menu_diagnostics.h": {
+      "source": "src/uss_menu_diagnostics.h",
+      "sha256": "e69cd4cb14e6cc99bcb2703c37c98b3caf65f6d12059eb44497d9e31bb9aadf8"
+    },
+    "src/uss_menu_external.h": {
+      "source": "src/uss_menu_external.h",
+      "sha256": "16f1dc2a36d1c9603c92efd8c08e7a0688a0d72cacc5036812a017332da5f421"
+    },
+    "src/uss_menu_first_use.h": {
+      "source": "src/uss_menu_first_use.h",
+      "sha256": "191e7295690d56ddc2d9012618fa866c7f1fea66c8566b6c61c8b57218734d00"
     },
     "src/uss_menu_handover.h": {
       "source": "src/uss_menu_handover.h",
@@ -738,6 +782,10 @@
     "src/uss_menu_startup_inputs.h": {
       "source": "src/uss_menu_startup_inputs.h",
       "sha256": "fd30cba9bbdb275de0c97db6fb228fa773e22aa9fc2d0eaf682715cd414f0c70"
+    },
+    "src/uss_menu_ui_policy.h": {
+      "source": "src/uss_menu_ui_policy.h",
+      "sha256": "e9047eea3a7bfb6134281ad502d5e063f404432658debc13f0c3c25871c65aa0"
     },
     "src/uss_native_assignment_display.h": {
       "source": "src/uss_native_assignment_display.h",
@@ -805,7 +853,7 @@
     },
     "src/uss_native_menu_session.h": {
       "source": "src/uss_native_menu_session.h",
-      "sha256": "27a82c25ceb2816509a099797abb131130835cb436476141fc9905bbac2a497d"
+      "sha256": "783b01b5a27292aa0faf9c5b1faeb04d9f6aec29a0dadf9ab32591e6f4e30dfb"
     },
     "src/uss_pickup_completion.h": {
       "source": "src/uss_pickup_completion.h",

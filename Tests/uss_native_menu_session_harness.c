@@ -26,5 +26,18 @@ int main(void){
     assert(first->menu.retired && !strcmp(first->menu.rows.rows[0].title,"Binding mode") && session.count==2);
     uss_menu_put_word(ui,0x429c+20,0);assert(uss_menu_session_retire(&session));
     assert(!uss_menu_session_allocate(&session,&context) && session.stopped && session.count==2);
+    /* A long sequence of retired screen lifetimes cannot retain unbounded nodes.
+     * These nodes never enter native UI, so this fixture may free them afterward. */
+    {
+        UssMenuSession bounded={0};unsigned i,limit=USS_MENU_SESSION_MAX_BYTES/sizeof(UssMenuSessionNode);
+        if(limit>USS_MENU_SESSION_MAX_LIFETIMES)limit=USS_MENU_SESSION_MAX_LIFETIMES;
+        assert(limit && sizeof(UssMenuSessionNode)<=USS_MENU_SESSION_MAX_BYTES);
+        bounded.allocate=uss_menu_session_heap;
+        for(i=0;i<limit;++i){assert(uss_menu_session_allocate(&bounded,&context));bounded.current=NULL;}
+        assert(!uss_menu_session_allocate(&bounded,&context)&&bounded.stopped&&bounded.storage_limited&&bounded.count==limit);
+        for(i=0;i<10000;++i)assert(!uss_menu_session_allocate(&bounded,&context)&&bounded.count==limit);
+        while(bounded.retained){UssMenuSessionNode* old=bounded.retained;bounded.retained=old->next;assert(HeapFree(GetProcessHeap(),0,old));}
+        printf("USS retained menu budget: node=%zu bytes, max=%u lifetimes, max_retained=%zu bytes; 10000 overflow attempts allocate nothing\n",sizeof(UssMenuSessionNode),limit,(size_t)limit*sizeof(UssMenuSessionNode));
+    }
     puts("USS menu session: stable allocation, SDK writer ownership, closed-only retirement, retained old storage and allocation-failure stop PASS");return 0;
 }

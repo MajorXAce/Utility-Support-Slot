@@ -44,6 +44,11 @@ Release the control after changing modes before using it again.
 The menu mods save their settings separately from USS's own menu. If you remove
 them, USS goes back to the settings you used in its own menu.
 
+For the Lua versions of these menus, also install the matching **Lua Menu
+Companion** release ZIP. With Lua menus, **6** remains available until your first
+accepted Utility Weapon binding press. While the identified Lua options menu is
+available, USS leaves settings in that menu instead of adding a competing tab.
+
 ## Pickup and Recovery
 
 Pickups follow the game's **Switch Weapon On Pickup** setting. With **No**, you

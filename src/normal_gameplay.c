@@ -7,6 +7,9 @@
 #include "uss_menu_startup_inputs.h"
 #include "uss_replacement_invoke.h"
 #include "uss_vpm_windows.h"
+#include "uss_menu_external.h"
+#include "uss_menu_diagnostics.h"
+#include "uss_menu_first_use.h"
 #ifndef HF_USS_NORMAL_ENABLED
 #define HF_USS_NORMAL_ENABLED 0
 #endif
@@ -17,6 +20,12 @@ typedef struct UssNormalSession {
     UssMenuSession menus;
     wchar_t settings_path[1024];
     UssVpmWindows external_menus;UssMenuHandover handover;
+    /* Optional Lua menu companion: one-slot copy-only mailbox, one-owner arbiter, bounded diagnostics. All zero-initialised statics are valid. */
+    UssLuaMenuMailbox lua_mailbox;UssMenuArbiter arbiter;UssMenuDiagnostics diag;UssMenuUiPolicy menu_ui;
+    unsigned menu_recover_after_close;
+    UssMenuFirstUse menu_first_use;
+    unsigned fallback_wake_known,fallback_wake_down;
+    volatile LONG published_default_mode;
     UssSettings standalone_settings;unsigned standalone_saved,external_down;
     const char* external_report;unsigned external_owner;
     uint64_t next_menu_check;
@@ -36,8 +45,37 @@ static int normal_foreground(void* user)
 static int normal_dedicated(void* user,const UssSettings* settings,unsigned* down)
 {
     UssNormalSession* state=user;
-    if(state->app.settings.external){if(!down)return 0;*down=state->external_down;return 1;}
+    unsigned local_down=0,was_taken;UssSettings fallback;
+    if(!down || !settings)return 0;
+    if(state->app.settings.external && state->arbiter.owner==USS_SOURCE_LUA){
+        /* No provider mapping is written. Until first accepted menu use, 6 is
+         * the internal fallback even while the options provider owns the mode. */
+        fallback=*settings;fallback.utility_key=0x36;fallback.utility_controller=0;
+        if(!uss_player_windows_dedicated(&state->player_windows,&fallback,&local_down))return 0;
+        was_taken=state->menu_first_use.taken;
+        *down=uss_menu_first_use_step(&state->menu_first_use,GetTickCount64(),state->handover.usable,
+            state->external_down,local_down,!state->app.settings.release_required);
+        if(!was_taken && state->menu_first_use.taken && state->app.native.api && state->app.native.api->log)
+            state->app.native.api->log(state->app.native.mod,"USS input source: menu binding first use; internal fallback disabled for this session while provider is available");
+        return 1;
+    }
+    uss_menu_first_use_reset(&state->menu_first_use);
+    if(state->app.settings.external){*down=state->external_down;return 1;}
     return uss_player_windows_dedicated(&state->player_windows,settings,down);
+}
+/* A fallback edge only schedules the ordinary guarded update. Do not call the
+ * first-use selector here: sampling must not consume takeover/release evidence. */
+static void normal_fallback_wake(UssNormalSession* state,const UssSettingsState* settings)
+{
+    unsigned down;
+    if(!settings->external || state->arbiter.owner!=USS_SOURCE_LUA || settings->current.mode!=USS_BIND_DEDICATED ||
+        (state->menu_first_use.taken && state->handover.usable) || !normal_foreground(state)){
+        state->fallback_wake_known=state->fallback_wake_down=0;return;
+    }
+    down=GetAsyncKeyState(0x36)<0;
+    if((state->fallback_wake_known && down!=state->fallback_wake_down) || (!state->fallback_wake_known && down))
+        uss_gameplay_loop_wake(&state->app.loop);
+    state->fallback_wake_known=1;state->fallback_wake_down=down;
 }
 static void normal_menu_stop(UssNormalSession* state,const char* reason)
 {
@@ -47,7 +85,7 @@ static void normal_menu_stop(UssNormalSession* state,const char* reason)
 static uint32_t normal_tab_input(uintptr_t bar,uintptr_t input,uintptr_t cursor)
 {
     UssMenuSessionNode* node=normal.menus.current;UssMenuOwnership* owner=NULL;unsigned capturing=0;
-    if(!normal.menu_stopped && node && node->menu.frame.controls.capture.phase!=USS_DEDICATED_IDLE &&
+    if(!normal.menu_stopped && !normal.menu_ui.deferred && node && node->menu.frame.controls.capture.phase!=USS_DEDICATED_IDLE &&
         node->sdk.thread==GetCurrentThreadId() && uss_menu_sdk_scope(&node->sdk)){
         owner=&node->menu.owner;capturing=1;
     }
@@ -126,21 +164,31 @@ static void normal_gameplay_report(UssNormalSession* state)
 /* Run on the existing owning game callback. A live standalone screen finishes
  * its lifetime before external ownership starts. Local settings never get saved
  * from an external edit; the provider persists its own mode/action mappings. */
+static void normal_diag_log(void* user,const char* line)
+{UssNormalSession* state=user;state->app.native.api->log(state->app.native.mod,"%s",line);}
 static void normal_external_menus(UssNormalSession* state,UssSettingsState* settings,unsigned busy,uint64_t now)
 {
-    UssMenuProviderSample sample={0};UssMenuHandoverView view;UssSettings draft;
-    unsigned available=0,was_down=state->external_down,transition;
+    UssMenuProviderSample sample={0};UssMenuHandoverView view;UssSettings draft;UssMenuChoice choice;
+    unsigned was_down=state->external_down,transition;
     const char* reason;
-    if(!settings->external){state->standalone_settings=settings->current;state->standalone_saved=1;}
+    if(!settings->external){state->standalone_settings=settings->current;state->standalone_saved=1;
+        InterlockedExchange(&state->published_default_mode,(LONG)state->standalone_settings.mode);} /* read by the Lua companion's default-mode export */
     if(!state->standalone_saved)return;
     if(uss_vpm_windows_discover(&state->external_menus,now,state->standalone_settings.mode))
-        available=uss_vpm_menus_sample(&state->external_menus.menus,&sample);
+        (void)uss_vpm_menus_sample(&state->external_menus.menus,&sample);
     /* A failed provider read revokes input now, rather than holding the last
      * pressed sample until lease expiry. Unknown/absent modules remain optional. */
-    if(state->menus.current && !settings->external)(void)uss_menu_session_retire(&state->menus);
-    view=uss_menu_handover_step(&state->handover,&sample,now,
+    /* One owner at a time: the C provider's copied sample (zeroed when unavailable: revoke at once) or the Lua companion's mailbox. The handover policy is unchanged. */
+    view=uss_menu_external_step(&state->handover,&state->arbiter,&state->lua_mailbox,&sample,now,
         busy || (!settings->external && state->menus.current!=NULL),!normal_foreground(state),
-        &state->standalone_settings,0);
+        &state->standalone_settings,0,&choice);
+    {unsigned lua_options,lua_bindings;
+     const char* lua_status=uss_menu_diag_lua_snapshot(&state->lua_mailbox,now,&lua_options,&lua_bindings);
+     (void)uss_menu_diag_provider(&state->diag,normal_diag_log,state,choice.source,view.external,
+         choice.source==USS_SOURCE_LUA?lua_options:state->external_menus.menus.option_registered,
+         choice.source==USS_SOURCE_LUA?lua_bindings:state->external_menus.menus.binding_registered,
+         state->external_menus.menus.provider?state->external_menus.menus.reason:state->external_menus.reason?state->external_menus.reason:"NOT_LOADED",
+         lua_status);}
     transition=view.external!=settings->external;
     if(!busy && (!transition || settings->external || !state->menus.current)){
         draft=view.external?settings->current:state->standalone_settings;draft.mode=view.mode;
@@ -154,13 +202,14 @@ static void normal_external_menus(UssNormalSession* state,UssSettingsState* sett
         }
         settings->external=view.external;settings->provider=view.external?state->handover.provider:0;
     }
-    state->external_down=settings->external && available && view.external?view.utility_down:0;
+    state->external_down=uss_menu_external_down(&state->handover,settings->external,&view);
     if(settings->external && settings->current.mode==USS_BIND_DEDICATED && (state->external_down || was_down))
         uss_gameplay_loop_wake(&state->app.loop);
+    normal_fallback_wake(state,settings);
     reason=state->external_menus.menus.provider?state->external_menus.menus.reason:state->external_menus.reason;
     if(reason && (reason!=state->external_report || settings->external!=state->external_owner)){
         state->external_report=reason;state->external_owner=settings->external;
-        state->app.native.api->log(state->app.native.mod,"USS external menus status=%s owner=%u options=%u bindings=%u",
+        state->app.native.api->log(state->app.native.mod,"USS C menu discovery status=%s external=%u options=%u bindings=%u",
             reason,settings->external,state->external_menus.menus.option_registered,state->external_menus.menus.binding_registered);
     }
 }
@@ -168,16 +217,28 @@ static void normal_menu_frame(void* user,float dt,UssSettingsState* settings,uns
 {
     UssNormalSession* state=user;const HfApi* api=state->app.native.api;
     UssMenuSdkContext context={0};UssMenuObservationIo observer;UssMenuHostSnapshot current={0};
-    UssMenuReadBudget budget={0};unsigned observed,status;
+    UssMenuReadBudget budget={0};unsigned observed,status,retired;
     unsigned char inert[216];unsigned result;uint64_t now=GetTickCount64();size_t size=0;
     normal_gameplay_report(state);
+    /* Retirement reads the closed-screen stack before any ownership/UI effect.
+     * Old nodes remain retained; a positive close is the only recovery boundary. */
+    retired=state->menus.current?uss_menu_session_retire(&state->menus):0;
+    uss_menu_ui_update(&state->menu_ui,&state->lua_mailbox,now,
+        retired?USS_MENU_SCREEN_CLOSED:USS_MENU_SCREEN_UNKNOWN,state->menus.current!=NULL);
+    if(retired){
+        uss_menu_diag_closed(&state->diag);
+        if(uss_menu_ui_recover_after_close(retired,state->menu_recover_after_close)){
+            state->menu_stopped=0;state->menu_recover_after_close=0;
+        }
+    }
     normal_external_menus(state,settings,busy,now);
     if(!state->menu_frames++)api->log(state->app.native.mod,"USS menu callback active; bootstrap observation pending");
-    if(state->menu_stopped || settings->external || settings->provider)return;
+    uss_menu_diag_ui(&state->diag,normal_diag_log,state,&state->menu_ui,state->handover.usable);
+    if(state->menu_stopped)return;
     if(state->menus.current){
+        if(settings->external || settings->provider || state->menu_ui.deferred)return;
         /* Closed-screen check occurs before the frame's destructive ownership
          * proof, allowing a new lifetime without reusing old native storage. */
-        if(uss_menu_session_retire(&state->menus))return;
         result=uss_menu_frame_step(&state->menus.current->menu.frame,dt,now,busy);
         {UssMenuFrame* frame=&state->menus.current->menu.frame;
          if(state->save_frame!=frame){state->save_frame=frame;state->save_reports=0;}
@@ -214,6 +275,7 @@ static void normal_menu_frame(void* user,float dt,UssSettingsState* settings,uns
                 menu->owner.last_observed.tab,menu->owner.last_observed.category,
                 menu->owner.last_observed.ours_intact,menu->owner.last_observed.foreign_owner,
                 menu->owner.last_observed.topmost,menu->owner.last_observed.language_changing);
+            state->menu_recover_after_close=1;
             normal_menu_stop(state,"FRAME_REFUSED");
         }
         return;
@@ -223,6 +285,9 @@ static void normal_menu_frame(void* user,float dt,UssSettingsState* settings,uns
     context.thread=GetCurrentThreadId();context.epoch=1;
     observer=uss_menu_sdk_observer(&context);
     observed=uss_menu_observe_host(&observer,NULL,&current,&budget);
+    uss_menu_ui_update(&state->menu_ui,&state->lua_mailbox,now,
+        !observed?USS_MENU_SCREEN_UNKNOWN:current.escape_present?USS_MENU_SCREEN_OPEN:USS_MENU_SCREEN_CLOSED,0);
+    uss_menu_diag_ui(&state->diag,normal_diag_log,state,&state->menu_ui,state->handover.usable);
     status=!observed?1:!current.escape_present?2:!current.topmost?3:current.language_changing?4:current.foreign_owner?5:!current.vanilla_intact?6:7;
     if(state->bootstrap_reports<16 && (!state->bootstrap_reports || status!=state->bootstrap_status || budget.checkpoint!=state->bootstrap_checkpoint)){
         ++state->bootstrap_reports;state->bootstrap_status=status;state->bootstrap_checkpoint=budget.checkpoint;
@@ -230,12 +295,24 @@ static void normal_menu_frame(void* user,float dt,UssSettingsState* settings,uns
             status,budget.checkpoint?budget.checkpoint:"UNSET",budget.calls,budget.bytes,budget.failed,budget.index,budget.actual,budget.expected,
             current.escape_present,current.topmost,current.language_changing,current.foreign_owner,current.vanilla_intact);
     }
-    if(status!=7)return;
+    /* Once per opening: provider/tab evidence for support (bounded: at most 8 four-byte reads, only while the standalone path already observes). */
+    if(observed && !current.escape_present)uss_menu_diag_closed(&state->diag);
+    if(observed && current.escape_present && !state->diag.open_reported){
+        UssMenuOpenEvidence evidence;const char* wait=state->external_menus.menus.provider?state->external_menus.menus.reason:state->external_menus.reason;
+        uss_menu_diag_collect(&observer,&current,&evidence);
+        (void)uss_menu_diag_open(&state->diag,normal_diag_log,state,&evidence,state->arbiter.owner,settings->external,
+            wait && (!strcmp(wait,"WAIT_API") || !strcmp(wait,"WAIT_READY")),state->menu_ui.close_required?"CLOSE_REOPEN_REQUIRED":state->menu_ui.deferred?"DEFER_IDENTIFIED_LUA_OPTIONS":settings->external?"EXTERNAL_PROVIDER":status==7?"APPEND":"WAIT_BOOTSTRAP");
+    }
+    if(status!=7 || settings->external || settings->provider || state->menu_ui.deferred)return;
     if(!uss_menu_read_inert(&observer,inert)){normal_menu_stop(state,"INERT_DESCRIPTOR_REFUSED");return;}
     if(!uss_menu_session_bootstrap(&state->menus,&context,settings,inert,sizeof(inert),state->settings_path,&state->capture_windows)){
-        if(state->menus.stopped)normal_menu_stop(state,"BOOTSTRAP_REFUSED");
+        if(state->menus.stopped)normal_menu_stop(state,state->menus.storage_limited?"SESSION_STORAGE_LIMIT":"BOOTSTRAP_REFUSED");
     }else if(!normal_tab_hook(state))normal_menu_stop(state,"TAB_INPUT_HOOK_REFUSED");
 }
+/* Optional Lua menu companion entry points. The companion finds this ALREADY-LOADED module by its manifest DLL name (GetModuleHandle, never a load or an install path),
+ * posts one fixed 64-byte copy-only record and may read the standalone mode USS would start from. Both return at once and call nothing in the game or in Lua. */
+HF_MOD_EXPORT int uss_lua_menu_post_v2(const void* data,uint32_t size){return (int)uss_lua_mailbox_post(&normal.lua_mailbox,data,size);}
+HF_MOD_EXPORT uint32_t uss_lua_menu_default_mode_v1(void){return (uint32_t)InterlockedCompareExchange(&normal.published_default_mode,0,0);}
 HF_MOD_EXPORT int hellforge_mod_init(const HfApi* api,HfMod* mod)
 {
     UssGameplayEnvironment environment={0};UssSettings saved;int loaded;const char* build;

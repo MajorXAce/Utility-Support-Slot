@@ -1,19 +1,9 @@
-A recovery and troubleshooting update for the HellForge version.
+A menu compatibility update for the HellForge version.
 
-## Fixed
+- Added optional Lua Mod Options Menu and Mod Bindings Menu support through the
+  separate Lua Menu Companion ZIP.
+- With Lua menus, 6 works until the first accepted Utility Weapon binding press.
+- Improved response to fallback key presses and releases before that first use.
 
-- Improved recovery after dropping or expending a weapon. The mod now waits longer
-  for the game to finish switching weapons before restoring the remaining weapon.
-- Improved recovery when pressing the swap control as a weapon is expended.
-- Opening a menu or switching away from the game no longer interrupts a pair
-  between weapon changes.
-
-## Troubleshooting
-
-- Logs now give more details if the mod stops working or pairing fails.
-- Added instructions to the README for reporting bugs and finding the USS log.
-
-## Known Issue
-
-- If a Silo pod is destroyed while its remote is stored, a ghost remote can remain
-  attached until you die. It is a visual bug and shouldn't affect gameplay.
+The existing primary-weapon transition limitation remains; its visual timing
+has not been remeasured by this update.

@@ -25,6 +25,8 @@ jobs:
         run: python Tools/sdk_inputs.py --fetch
       - name: Test, build and package
         run: python Tools/build.py --compiler msvc --test --package
+      - name: Package optional Lua menu companion
+        run: python Tools/build_companion.py --package
       - uses: actions/upload-artifact@v4
         with:
           name: Utility-Support-Slot
@@ -39,7 +41,7 @@ jobs:
           $tag = "v$version"
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists; preserve its files." }
-          $releaseArgs = @('release', 'create', $tag, "dist/Utility-Support-Slot-v$version.zip", '--target', '${{ github.sha }}', '--title', "Utility Support Slot $version", '--notes-file', 'release_notes.md')
+          $releaseArgs = @('release', 'create', $tag, "dist/Utility-Support-Slot-v$version.zip", "dist/Utility-Support-Slot-Lua-Menu-Companion-v$version.zip", '--target', '${{ github.sha }}', '--title', "Utility Support Slot $version", '--notes-file', 'release_notes.md')
           if ($env:PUBLISH_RELEASE -ne 'true') { $releaseArgs += '--draft' }
           & gh @releaseArgs
           if ($LASTEXITCODE -ne 0) { throw 'Release creation failed' }

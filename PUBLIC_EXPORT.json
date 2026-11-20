@@ -978,6 +978,18 @@
     "Tools/check_release_workflow.py": {
       "source": "PublicRelease/Tools/check_release_workflow.py",
       "sha256": "29b9b3bedff0bf1fb297a68376fec738bf0f6e1e2075c1d93c1c970f7b47c4ed"
+    },
+    "src/uss_native_lua_api.h": {
+      "source": "src/uss_native_lua_api.h",
+      "sha256": "7287357dd06c5d0249bee56f286e2ce01994fc860dc63730892ebf651e483ccd"
+    },
+    "src/uss_native_lua_client.h": {
+      "source": "src/uss_native_lua_client.h",
+      "sha256": "98d3b358221c7a4f14aa7a416ffccb123aac02fe354c59b65d64f894ba6a831d"
+    },
+    "src/uss_native_lua_windows.h": {
+      "source": "src/uss_native_lua_windows.h",
+      "sha256": "92a6e2f7b40a9d9dc38df71a6a2c651fa535d0a99a0c14e68a2acc2fdc0fb20a"
     }
   },
   "private_evidence_exported": false,
@@ -1021,6 +1033,9 @@
     "src/uss_lua_menu_mailbox.h",
     "src/uss_menu_diagnostics.h",
     "src/uss_menu_ui_policy.h",
+    "src/uss_native_lua_api.h",
+    "src/uss_native_lua_client.h",
+    "src/uss_native_lua_windows.h",
     "src/uss_native_menu_entries.h",
     "src/uss_player_control.h",
     "src/uss_player_input_sdk.h",

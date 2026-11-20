@@ -1,14 +1,11 @@
-/* Optional Lua menu companion -> C USS mailbox.
- *
- * What it is: a one-slot, copy-only mailbox. A small Lua addon registers USS's Binding Mode option and Utility Weapon binding with the REAL Lua providers
- * (ModOptionsMenu / ModBindingsMenu), then every few hundred milliseconds posts one fixed-size, versioned record here through ONE exported C function.
- * What it is not: C never calls into Lua, no Lua table or pointer is kept, no lock is held across any provider or native call, and nothing here touches the game
- * or the UI. The post may arrive on whatever thread Lua runs on; the game thread consumes copies in uss_lua_mailbox_take().
- *
- * Trust model: the record is untrusted input. Every field is validated; a malformed post can never become a pressed action, and it revokes a held lease at once
- * (the same rule the C provider path follows). A replayed or older record is ignored and cannot refresh the lease: only a NEW accepted sequence counts as a heartbeat.
- * "instance" identifies one Lua companion run (a restart or reload picks a new one) so a replacement is told apart from a replay. Sequence restarts at 1 for a new instance.
- * The output is the existing provider-neutral UssMenuProviderSample, so the proven handover policy (lease, release-before-resume, mode change rules) is reused, not copied. */
+/* Copy-only Lua-provider observations for the C menu receiver.
+ * Both the optional Lua adapter and native Lua client publish the same fixed
+ * protocol record. No Lua pointer or provider call crosses this lock. Latest
+ * heartbeats coalesce; an opted-in receiver can retain eight input transitions
+ * in order, bound to its actor/settings scope and trusted receipt clock.
+ * Malformed input revokes immediately; replay cannot renew the lease. The
+ * existing provider-neutral handover retains lease and release-before-resume
+ * rules. This transport never queues or retries a native gameplay effect. */
 #ifndef USS_LUA_MENU_MAILBOX_H
 #define USS_LUA_MENU_MAILBOX_H
 #include <windows.h>
@@ -49,6 +46,12 @@ typedef struct UssLuaMenuMailbox {
     unsigned counts[USS_LUA_POST_RESULT_COUNT];
     unsigned last_rejected;       /* result of the most recent malformed post (a replay is not a rejection) */
     uint64_t last_instance, last_sequence;
+    /* Opt-in semantic transitions, not native commands. Scope is receiver-owned.
+     * Heartbeats coalesce; eight transitions retain original sequence/receipt.
+     * Overflow revokes instead of replaying an arbitrary subset of presses. */
+    struct { UssLuaMenuPost post;uint64_t received_ms; } edges[8];
+    unsigned edge_head,edge_count,edge_enabled,edge_baseline;
+    uint64_t edge_scope[6];unsigned edge_queued,edge_taken,edge_canceled,edge_overflow;
     uint64_t received_ms; /* Trusted receiver clock, captured under the publication lock. */
 } UssLuaMenuMailbox;
 static inline void uss_lua_mailbox_init(UssLuaMenuMailbox* box)
@@ -60,6 +63,18 @@ static inline int uss_lua_post_fields_valid(const UssLuaMenuPost* p)
     return p->instance && p->sequence && p->options_registered <= 1 && p->bindings_registered <= 1 && p->ready <= 1 && p->input_valid <= 1 &&
         p->utility_down <= 1 && p->action_blocked <= 1 && !(p->action_blocked && p->utility_down) && p->generation != 0 && (!(p->options_registered || p->ready) || (p->flags & USS_LUA_MENU_OPTIONS_PRESENT)) &&
         (p->mode == USS_BIND_DEFAULT || p->mode == USS_BIND_DEDICATED);
+}
+/* Receiver binds queued observations to the same actor/settings/provider scope.
+ * Menu/focus/release/stopped boundaries disable and discard before consumption. */
+static inline void uss_lua_mailbox_scope(UssLuaMenuMailbox* box,const uint64_t scope[6],unsigned enabled)
+{
+ AcquireSRWLockExclusive(&box->lock);
+ if(!enabled || !box->edge_enabled || memcmp(box->edge_scope,scope,sizeof box->edge_scope)){
+  box->edge_canceled+=box->edge_count;box->edge_head=box->edge_count=0;box->edge_baseline=0;
+ }
+ memcpy(box->edge_scope,scope,sizeof box->edge_scope);box->edge_enabled=enabled;
+ if(enabled && box->slot.ready && box->slot.input_valid && !box->slot.action_blocked && !box->slot.utility_down)box->edge_baseline=1;
+ ReleaseSRWLockExclusive(&box->lock);
 }
 /* Any thread. `size` is what the caller says it wrote; nothing past it is read. Returns a UssLuaPostResult. */
 static inline unsigned uss_lua_mailbox_post(UssLuaMenuMailbox* box, const void* data, uint32_t size)
@@ -82,8 +97,15 @@ static inline unsigned uss_lua_mailbox_post(UssLuaMenuMailbox* box, const void* 
     if (result == USS_LUA_POST_ACCEPTED) {
         /* A changed table generation cannot inherit a held binding from the prior table. */
         if (local.instance == box->last_instance && local.generation != box->slot.generation) box->revoke = 1;
+        if(local.instance!=box->last_instance || local.generation!=box->slot.generation || local.mode!=box->slot.mode || !local.ready || !local.input_valid || local.action_blocked){
+            box->edge_canceled+=box->edge_count;box->edge_head=box->edge_count=0;box->edge_baseline=0;
+        }else if(box->edge_enabled && box->edge_baseline && local.utility_down!=box->slot.utility_down){
+            if(box->edge_count==8){box->edge_canceled+=box->edge_count;box->edge_head=box->edge_count=0;box->edge_baseline=0;box->edge_enabled=0;box->revoke=1;++box->edge_overflow;}
+            else {unsigned at=(box->edge_head+box->edge_count)%8;box->edges[at].post=local;box->edges[at].received_ms=USS_LUA_RECEIPT_CLOCK();++box->edge_count;++box->edge_queued;}
+        }
+        if(box->edge_enabled && local.ready && local.input_valid && !local.action_blocked && !local.utility_down)box->edge_baseline=1;
         box->invalidated = 0; box->slot = local; box->received_ms = USS_LUA_RECEIPT_CLOCK(); box->fresh = 1; box->last_instance = local.instance; box->last_sequence = local.sequence;
-    } else if (result != USS_LUA_POST_REPLAY) { box->revoke = 1; box->last_rejected = result; box->fresh = 0; box->invalidated = 1; }   /* malformed: revoke; a replay only has no effect */
+    } else if (result != USS_LUA_POST_REPLAY) { box->edge_canceled+=box->edge_count;box->edge_count=box->edge_head=box->edge_baseline=0;box->revoke = 1; box->last_rejected = result; box->fresh = 0; box->invalidated = 1; }   /* malformed: revoke; a replay only has no effect */
     ++box->counts[result];
     ReleaseSRWLockExclusive(&box->lock);
     return result;
@@ -109,7 +131,12 @@ static inline int uss_lua_mailbox_take_receipt(UssLuaMenuMailbox* box, UssMenuPr
     AcquireSRWLockExclusive(&box->lock);
     local = box->slot; fresh = box->fresh; revoke = box->revoke;
     if (receipt_ms) *receipt_ms = box->received_ms;
-    if (revoke) box->revoke = 0; else box->fresh = 0;   /* a good record posted after a malformed one is still delivered on the next take */
+    if(!revoke && box->edge_enabled && box->edge_count){
+        unsigned at=box->edge_head;local=box->edges[at].post;fresh=1;
+        if(receipt_ms)*receipt_ms=box->edges[at].received_ms;
+        box->edge_head=(at+1)%8;--box->edge_count;++box->edge_taken;
+        if(local.sequence==box->slot.sequence)box->fresh=0;
+    }else if (revoke) box->revoke = 0; else box->fresh = 0;   /* a good record posted after a malformed one is still delivered on the next take */
     ReleaseSRWLockExclusive(&box->lock);
     memset(out, 0, sizeof *out);
     if (revoke) { if (invalid) *invalid = 1; return 1; }

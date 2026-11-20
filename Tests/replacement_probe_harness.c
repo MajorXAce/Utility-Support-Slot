@@ -1,6 +1,6 @@
 #define USS_REPLACEMENT_COMMAND_TEST_MAIN replacement_command_regression_checks
 #include "replacement_command_harness.c"
-#define hellforge_mod_init hf052_fixture_init
+#define hellforge_mod_init replacement_fixture_init
 #include "../ResearchSource/replacement_probe.c"
 #undef hellforge_mod_init
 static HfTickCallback prototype_callback;
@@ -10,16 +10,16 @@ static int register_prototype(HfMod* mod,HfTickCallback callback,void* user)
 static const char* prototype_logs(HfMod* mod)
 {
     static char path[1024];DWORD n;assert(mod==MOD);
-    n=GetFullPathNameA("build/hf-uss-052/platform-fixture",1024,path,NULL);assert(n && n<1024);return path;
+    n=GetFullPathNameA("build/replacement-platform/platform-fixture",1024,path,NULL);assert(n && n<1024);return path;
 }
 static void clean_prototype_files(void)
 {
     wchar_t path[1024];unsigned i;
-    assert(CreateDirectoryW(L"build/hf-uss-052",NULL) || GetLastError()==ERROR_ALREADY_EXISTS);
-    assert(CreateDirectoryW(L"build/hf-uss-052/platform-fixture",NULL) || GetLastError()==ERROR_ALREADY_EXISTS);
-    DeleteFileW(L"build/hf-uss-052/platform-fixture/hf052-session.bin");
-    DeleteFileW(L"build/hf-uss-052/platform-fixture/hf052-session.tmp");
-    for(i=1;i<=16;++i){assert(swprintf(path,1024,L"build/hf-uss-052/platform-fixture/hf052-request-%02u.bin",i)>0);DeleteFileW(path);}
+    assert(CreateDirectoryW(L"build/replacement-platform",NULL) || GetLastError()==ERROR_ALREADY_EXISTS);
+    assert(CreateDirectoryW(L"build/replacement-platform/platform-fixture",NULL) || GetLastError()==ERROR_ALREADY_EXISTS);
+    DeleteFileW(L"build/replacement-platform/platform-fixture/hf052-session.bin");
+    DeleteFileW(L"build/replacement-platform/platform-fixture/hf052-session.tmp");
+    for(i=1;i<=16;++i){assert(swprintf(path,1024,L"build/replacement-platform/platform-fixture/hf052-request-%02u.bin",i)>0);DeleteFileW(path);}
 }
 static void own_request(const void* data,DWORD size,unsigned sequence)
 {
@@ -33,7 +33,7 @@ int main(void)
     UssReplacementRequest command_request={0};unsigned before;
     assert(replacement_command_regression_checks()==0);clean_prototype_files();adapter_fixture(1,0,1,HF_SESSION_HOST);
     fake.logs_folder=prototype_logs;fake.on_game_thread=register_prototype;prototype_registration=1;
-    assert(hf052_fixture_init(&fake,MOD)==0 && prototype_callback && !prototype_terminal);
+    assert(replacement_fixture_init(&fake,MOD)==0 && prototype_callback && !prototype_terminal);
     before=reads;prototype_callback(MOD,0,NULL);assert(reads==before && !prototype_initialized);
     /* Own-process real file transport, synthetic SDK graph. Remember performs
      * observations only; fixture_native effects remain zero without a form command. */

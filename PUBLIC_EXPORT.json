@@ -9,7 +9,7 @@
     },
     ".github/workflows/player-release.yml": {
       "source": "PublicRelease/.github/workflows/player-release.yml",
-      "sha256": "c5d3503c755b8a91f57b2542145f4e37af13a33dac4427a04ec415199db781d3"
+      "sha256": "73f92fb8097c6f943fc799adb6e47f3c7229b759431bc8b52f95d20e26dbd703"
     },
     ".gitignore": {
       "source": "PublicRelease/.gitignore",
@@ -17,15 +17,7 @@
     },
     "BUILDING.md": {
       "source": "PublicRelease/BUILDING.md",
-      "sha256": "bfe8524c68e357de834af2df6aae40954f153bc3a57e3a4c210cb9d086bf751d"
-    },
-    "COMPANION.md": {
-      "source": "PublicRelease/COMPANION.md",
-      "sha256": "1cee001b44e8e01a99ca8af3843e4e3714bacc7cdf548c8a0d29e2525473949a"
-    },
-    "Companion/uss_lua_menu_bridge.lua": {
-      "source": "Companion/uss_lua_menu_bridge.lua",
-      "sha256": "e63593929f2cbcd55a1c0d89bf1c5e1773c065167e07790c1c1c2ba6c86dad9c"
+      "sha256": "641f58d9a961a6640fefdc2cd7339e8818b9145f74c1db6bd1b18c7d9328a2a8"
     },
     "LICENSE": {
       "source": "PublicRelease/LICENSE",
@@ -33,19 +25,19 @@
     },
     "README.md": {
       "source": "PublicRelease/README.md",
-      "sha256": "1a8ac8f9f7b92d5cab7569d65abd4bc076b9c8904472076bf4ee2c5b24711a0b"
+      "sha256": "26b97bc4085f6e09124dd95f0f527d5a29a43841ad10d341e1b9a98b44a37583"
     },
     "ResearchSource/capture_probe.c": {
       "source": "ResearchSource/capture_probe.c",
-      "sha256": "968d30a6f50c39856214b1a8d9bf2234b3a10d43c8d657e86eb36459101d11e5"
+      "sha256": "2dfa3bda0961e88787ba00ce4bfb5d1f64157ad76fa317d7bb42f256fbe7c3fb"
     },
     "ResearchSource/formation_probe.c": {
       "source": "ResearchSource/formation_probe.c",
-      "sha256": "f71d326d0d6373f02025ce2b12d527f8de606936e2e65518f362516c8fb15fcf"
+      "sha256": "2efe3114d69ae08e6a7d853f089658e5aa4cffd3b7a92e44a771bb7f8023d59a"
     },
     "ResearchSource/inventory_probe.c": {
       "source": "ResearchSource/inventory_probe.c",
-      "sha256": "2f3a486db2299329b1bc2a6d8cd6359eb8d118757b6495bbc263a72a6027d569"
+      "sha256": "3684e0bd2c33347dfbfe3fe0eead6439348d7170aa238ee3344f2d56e92ff3b2"
     },
     "ResearchSource/inventory_reader.h": {
       "source": "ResearchSource/inventory_reader.h",
@@ -53,11 +45,7 @@
     },
     "ResearchSource/replacement_probe.c": {
       "source": "ResearchSource/replacement_probe.c",
-      "sha256": "fcba0a0ed9cc7043e39e10eb24b217782fe5ba8bb5320c6509ac494be3e80719"
-    },
-    "ResearchSource/selection_probe.c": {
-      "source": "ResearchSource/selection_probe.c",
-      "sha256": "118e7345098b58e3d5c24bad44163e8169fea8a02f5f86cc3221b76e37383dc9"
+      "sha256": "3aaf031859ca61c263b2f2ba82dbf531fef1d2b9b2412dfc920c84668478c530"
     },
     "THIRD_PARTY_LICENSES.txt": {
       "source": "PublicRelease/THIRD_PARTY_LICENSES.txt",
@@ -69,11 +57,11 @@
     },
     "Tests/capture_diagnostic_harness.c": {
       "source": "Tests/capture_diagnostic_harness.c",
-      "sha256": "7a15334917909f5a0d6bddd083fdd1bf7939740e431b2c79aa740b77a3c80c47"
+      "sha256": "378a8ec4a655fff7fc74942f7fa019bf22f95c4aefcb19402e628226ec01bab2"
     },
     "Tests/capture_probe_harness.c": {
       "source": "Tests/capture_probe_harness.c",
-      "sha256": "6374776058ef62bace0e5cd2ce2ec924d161fbb57ae88b7e43d259fd7eefe9a3"
+      "sha256": "6c937027123e928bd7a2e9b7a22d50451a9dd7475072ca64aae6920821dd5f4f"
     },
     "Tests/core_candidates_harness.c": {
       "source": "Tests/core_candidates_harness.c",
@@ -85,7 +73,7 @@
     },
     "Tests/core_observation_harness.c": {
       "source": "Tests/core_observation_harness.c",
-      "sha256": "190038d4214a685e568e1abeb07752abf23f5debecb06f78ae8032567022ab8d"
+      "sha256": "f43e5e589171a824d23522f9c78567fec0d3dc95159d123efea732bfa89ab948"
     },
     "Tests/custom_support_harness.c": {
       "source": "Tests/custom_support_harness.c",
@@ -101,7 +89,7 @@
     },
     "Tests/formation_probe_harness.c": {
       "source": "Tests/formation_probe_harness.c",
-      "sha256": "f7ef248ac30e6553330bf052492add2e95beb7fcc13630a4b7a04229587288fd"
+      "sha256": "eb230771bfbd67f87ce4e6b296b7821574c14a38690390182b323a3988baa997"
     },
     "Tests/formation_runtime_harness.c": {
       "source": "Tests/formation_runtime_harness.c",
@@ -113,7 +101,7 @@
     },
     "Tests/inventory_harness.c": {
       "source": "Tests/inventory_harness.c",
-      "sha256": "73f19642c10abb55f6af941836065d17e6ef4e4485efe6cc47e0cada39fecb67"
+      "sha256": "3b57d48628a4cc51b8fdfcbc08b89efa95be6539fc67f6f7aa64abf058fed31b"
     },
     "Tests/menu_first_use_harness.c": {
       "source": "Tests/menu_first_use_harness.c",
@@ -161,11 +149,11 @@
     },
     "Tests/replacement_adapter_harness.c": {
       "source": "Tests/replacement_adapter_harness.c",
-      "sha256": "ca57151179e6f8eff11fdbd7c8352eeeb79d6e26988d49f3c3615dff4f644b6c"
+      "sha256": "b83a88fe27dee25ae614216fd2927b64a934060b8c2755d4b3697b526fa21142"
     },
     "Tests/replacement_command_harness.c": {
       "source": "Tests/replacement_command_harness.c",
-      "sha256": "a802acd428c0ad957470f01f54619bc648628f77fa6176819484937d846b89eb"
+      "sha256": "84f7c1efd6233b71a45f3d25e533bdf72bbc7449c2ae711358a0cb7234c7129e"
     },
     "Tests/replacement_dispatch_harness.c": {
       "source": "Tests/replacement_dispatch_harness.c",
@@ -173,15 +161,15 @@
     },
     "Tests/replacement_observation_harness.c": {
       "source": "Tests/replacement_observation_harness.c",
-      "sha256": "3de21262845821e20fb28250dc30034f76796ac4720d659e8554378fbef1e8e9"
+      "sha256": "f81d35504a76b23da77e635f06157d7e0bf036487657400e16953abcc85355c8"
     },
     "Tests/replacement_probe_harness.c": {
       "source": "Tests/replacement_probe_harness.c",
-      "sha256": "d8c69cd09053725fbb7cf5fd2945e562f2be39bb010434539e98c2f52ade67d2"
+      "sha256": "bb69ee384924c29b0dc518108094e00f0dd19ef572cd413dcaa573003a25d78c"
     },
     "Tests/replacement_transaction_harness.c": {
       "source": "Tests/replacement_transaction_harness.c",
-      "sha256": "835b05e8c19ccb129f8e872e41d38f2b5a6a90dfe483fda4eeb6690ac40e7f4a"
+      "sha256": "571cc8dd23107030ff0add7f3826157cb658593ad3efab9132b357745bf20c26"
     },
     "Tests/sdk11_abi_harness.c": {
       "source": "Tests/sdk11_abi_harness.c",
@@ -190,14 +178,6 @@
     "Tests/sdk_compat_harness.c": {
       "source": "Tests/sdk_compat_harness.c",
       "sha256": "8f3cc86e416950cec834e7109630dc8d6364174d03ada3db49338170b2809676"
-    },
-    "Tests/selection_control_harness.c": {
-      "source": "Tests/selection_control_harness.c",
-      "sha256": "989644f70b5829b873cfb3c7838b60ac26b22ffa56c916979492399b3514c5e3"
-    },
-    "Tests/selection_probe_harness.c": {
-      "source": "Tests/selection_probe_harness.c",
-      "sha256": "6304d69fda5ca3131aa803c8d2aa0669271052e515320dd30ce10f9362383f32"
     },
     "Tests/support_observation_harness.c": {
       "source": "Tests/support_observation_harness.c",
@@ -221,7 +201,7 @@
     },
     "Tests/uss_automatic_retained_harness.c": {
       "source": "Tests/uss_automatic_retained_harness.c",
-      "sha256": "95c45be0ff99525d91c13e978a3f6b8be2ef220d3d78974081d7f7df5b6b9064"
+      "sha256": "45f95eb083f647bf2d44da1888a77828ca3c6a540898b499abbdaaeb5c48b534"
     },
     "Tests/uss_binding_capture_harness.c": {
       "source": "Tests/uss_binding_capture_harness.c",
@@ -273,7 +253,7 @@
     },
     "Tests/uss_lua_menu_bridge_harness.c": {
       "source": "Tests/uss_lua_menu_bridge_harness.c",
-      "sha256": "374fd074388ed8fb7560473d8ab7d46c27db5ecebefd4df1c91f806b9bc18361"
+      "sha256": "aed2b2ccfdaac475366ace8b9c6bdcb4ac834aa3526127d94cf08e66f5e4e094"
     },
     "Tests/uss_menu_capture_guard_harness.c": {
       "source": "Tests/uss_menu_capture_guard_harness.c",
@@ -453,7 +433,7 @@
     },
     "Tests/uss_solo_harness.c": {
       "source": "Tests/uss_solo_harness.c",
-      "sha256": "1ab21c09a70649f5a533a29f81a19eebdfac065676584f55f8f9a052f24e5b99"
+      "sha256": "f444ca015c3636b4e4cef3bf88b6817c0bf62ff67c5f3889bde15af2201b98d5"
     },
     "Tests/uss_supply_observer_harness.c": {
       "source": "Tests/uss_supply_observer_harness.c",
@@ -469,7 +449,7 @@
     },
     "Tests/uss_vpm_windows_harness.c": {
       "source": "Tests/uss_vpm_windows_harness.c",
-      "sha256": "f68a68d77fc8e863be2e6d3bc3eb3c63f2550928b06f28e5ef300a327b17d91b"
+      "sha256": "0e5c1efc56911cc835de5e717f87a3579f0eecaeabb13d37305a31bccffb85c5"
     },
     "Tests/uss_zone_hygiene_harness.c": {
       "source": "Tests/uss_zone_hygiene_harness.c",
@@ -481,15 +461,11 @@
     },
     "Tools/build.py": {
       "source": "PublicRelease/Tools/build.py",
-      "sha256": "7dbd9acb149d4680efa6e4d72e4aba43cfbbace23df76f0acb5020f47577b3c6"
-    },
-    "Tools/build_companion.py": {
-      "source": "PublicRelease/Tools/build_companion.py",
-      "sha256": "057239373f1a0dc3b7a97cd8e37f0d411288f6a80ef1f2f53f96aaa8f2fde081"
+      "sha256": "920f8c136a2455067806d04455738cdd6f2d22f203c05e61da383b4d7cabbfd0"
     },
     "Tools/check_current.py": {
       "source": "PublicRelease/Tools/check_current.py",
-      "sha256": "8e22639715b648c69f1cb6665574c211c55cf465058144e0b53041a86a5d738c"
+      "sha256": "752ff600402bee152875d4d79819db2f7d1fad8757e107ed09ecb27d24a500b6"
     },
     "Tools/sdk_baseline.json": {
       "source": "PublicRelease/Tools/sdk_baseline.json",
@@ -513,7 +489,7 @@
     },
     "release_notes.md": {
       "source": "PublicRelease/release_notes.md",
-      "sha256": "7ff86f3c4b5de763dde86089ce6aef0c9e9edd90115d26172c1b272df73ba6df"
+      "sha256": "0c000118186c1d0ec54b78cf2caaf1cdc4e4b1dc719f3e764704f1d83f733497"
     },
     "src/action_state.h": {
       "source": "src/action_state.h",
@@ -521,7 +497,7 @@
     },
     "src/attachment_entry_pin.h": {
       "source": "src/attachment_entry_pin.h",
-      "sha256": "8f6c4b17115ce872b5ea3f31b5566a6b2cae9358f362726b7d07bf623470e801"
+      "sha256": "6f8aa023c6e9e35b1d2eb80edff8971a14abc0d0a0c16adc7815b57eea25d205"
     },
     "src/candidate_lifecycle.h": {
       "source": "src/candidate_lifecycle.h",
@@ -529,7 +505,7 @@
     },
     "src/capture_diagnostic.h": {
       "source": "src/capture_diagnostic.h",
-      "sha256": "d6f246feb0fec72b43c32b375cfa9e8b1818712d527492a97822da6e1832a785"
+      "sha256": "9ffc87348060b571355967130823c78c221b28380e7d37411724f6ba4864ae2d"
     },
     "src/capture_dispatch.h": {
       "source": "src/capture_dispatch.h",
@@ -589,7 +565,7 @@
     },
     "src/normal_gameplay.c": {
       "source": "src/normal_gameplay.c",
-      "sha256": "70e73787ef43f0dd900184b3866887fcb393225faf7a9f5c03d1eb891e94c8c2"
+      "sha256": "ff7b5b5dadbbdc5b75bb04e885fbfc7f5b5efcdf2864ca9857886069c8b65ce5"
     },
     "src/pair_member.h": {
       "source": "src/pair_member.h",
@@ -629,7 +605,7 @@
     },
     "src/replacement_command.h": {
       "source": "src/replacement_command.h",
-      "sha256": "6dcc920ce343e3d55f81c734c38ffd75a56447715eaa11a40ae7139ccf892ee2"
+      "sha256": "6368a1ab65ee2c218f4699d5f7a9d0299b0e8801009c67d6599c1567c296af94"
     },
     "src/replacement_control_pins.h": {
       "source": "src/replacement_control_pins.h",
@@ -650,10 +626,6 @@
     "src/sdk_compat.h": {
       "source": "src/sdk_compat.h",
       "sha256": "b756fce01897ca6fc5ae0d0bbe0cd9eb51737888b928ceab1eb0eb6c576e17a0"
-    },
-    "src/selection_control.h": {
-      "source": "src/selection_control.h",
-      "sha256": "52db7f91f24c96a537977a007c15636a0e4d5d48282b2c25b50a684a1b62fbdc"
     },
     "src/selection_entry_pins.h": {
       "source": "src/selection_entry_pins.h",
@@ -745,7 +717,7 @@
     },
     "src/uss_lua_menu_mailbox.h": {
       "source": "src/uss_lua_menu_mailbox.h",
-      "sha256": "e6f0e4f5ef2e09a2d874922f04be6bd90bf7ec168a39914f6bd8bc04e4fb6df7"
+      "sha256": "406bf0067809bf9ed14452748b407cc62cf8ebfb51fccf254d934a25bebcaa14"
     },
     "src/uss_member_pin.h": {
       "source": "src/uss_member_pin.h",
@@ -761,7 +733,7 @@
     },
     "src/uss_menu_diagnostics.h": {
       "source": "src/uss_menu_diagnostics.h",
-      "sha256": "e69cd4cb14e6cc99bcb2703c37c98b3caf65f6d12059eb44497d9e31bb9aadf8"
+      "sha256": "fa43bec90d7df91ec1060407176177befee8de66dc393d7a61df7eb1af132d6a"
     },
     "src/uss_menu_external.h": {
       "source": "src/uss_menu_external.h",
@@ -785,7 +757,7 @@
     },
     "src/uss_menu_ui_policy.h": {
       "source": "src/uss_menu_ui_policy.h",
-      "sha256": "e9047eea3a7bfb6134281ad502d5e063f404432658debc13f0c3c25871c65aa0"
+      "sha256": "e6099204499fe2a20a85efc2bf6db22372b6c4055b48d49f4a088a1f34c7cb19"
     },
     "src/uss_native_assignment_display.h": {
       "source": "src/uss_native_assignment_display.h",
@@ -817,7 +789,7 @@
     },
     "src/uss_native_menu_entries.h": {
       "source": "src/uss_native_menu_entries.h",
-      "sha256": "f498bdd22f58c3ebef1a387174a91253770f901cf06c89cd1005c773c3a95e9e"
+      "sha256": "03b4bed661efaba9e65fc1370b60e08cc7bc6a2ac470f397d8b88bdb3fd7adc8"
     },
     "src/uss_native_menu_frame.h": {
       "source": "src/uss_native_menu_frame.h",
@@ -873,11 +845,11 @@
     },
     "src/uss_player_control.h": {
       "source": "src/uss_player_control.h",
-      "sha256": "3b073e3e48575de3c7569bc745eb7ff4a5dd4577214124f3aa062348029280a5"
+      "sha256": "d697892ce9516394015b73d0a20be05791d009785982d07641ca8edf4ca4f21e"
     },
     "src/uss_player_input_sdk.h": {
       "source": "src/uss_player_input_sdk.h",
-      "sha256": "ad8fd93af27df293559d02fdc7e8b71132fa0886c809a77f68c13928471e45a7"
+      "sha256": "d239dd16d57be3c418b6bf01e7a798ecb8d30feb3973c3b7289f4dd40ad1572e"
     },
     "src/uss_player_input_windows.h": {
       "source": "src/uss_player_input_windows.h",
@@ -949,7 +921,7 @@
     },
     "src/uss_settings.h": {
       "source": "src/uss_settings.h",
-      "sha256": "bf8e9d45c78bbae30c39db43e2763dd9317d730dfbc4fb24b9860bd0f3bdc1e7"
+      "sha256": "852b20a901c7af7391e92dac58c4fa194dfe2606152eb1f017f2ad9417c0fe83"
     },
     "src/uss_settings_store.h": {
       "source": "src/uss_settings_store.h",
@@ -965,11 +937,11 @@
     },
     "src/uss_vpm_menus.h": {
       "source": "src/uss_vpm_menus.h",
-      "sha256": "ba1ffc8a26a2dd5f3d2483edf69793097d328cf343ac48b832a7519450b07763"
+      "sha256": "3591ef21b785977c8015d4ffe2c4587574ecf4a16a207b9cf537513937a6b12a"
     },
     "src/uss_vpm_windows.h": {
       "source": "src/uss_vpm_windows.h",
-      "sha256": "ba18cd478986d3576c848c7e3c48be7c0ed93c3fd35792236b520e46b5079ded"
+      "sha256": "c35dff036487fabae948feb63bc281f9525f79a465e0ea995643df1768a897e1"
     },
     "src/uss_zone_hygiene.h": {
       "source": "src/uss_zone_hygiene.h",
@@ -982,9 +954,91 @@
     "src/weapon_policy.h": {
       "source": "src/weapon_policy.h",
       "sha256": "431faa7ab60b5e531fe9926333522556e2c533f29c43dfb1d3ce1504c58b09b6"
+    },
+    "Tools/check_package.py": {
+      "source": "PublicRelease/Tools/check_package.py",
+      "sha256": "e4ab492d174d8a9069e6499d33007609fd37c97c8e15210614c096f8ce84d4e6"
+    },
+    "Tools/player_package.py": {
+      "source": "PublicRelease/Tools/player_package.py",
+      "sha256": "03f86a669cff710a07a869bd338eb5883e65011fee4b2f3029dd68d0c110e1e6"
+    },
+    "Tests/default_fallback_harness.c": {
+      "source": "Tests/default_fallback_harness.c",
+      "sha256": "b69fae82d01fed574ae9866121b3a4b4f8cdc57a798fc306430b1cb7b6df1e74"
+    },
+    "Tests/default_fallback_sdk_harness.c": {
+      "source": "Tests/default_fallback_sdk_harness.c",
+      "sha256": "c11fcec4b59ee661085533aac9585361a8f09edbd4ab135b304eca12365e169a"
+    },
+    "Tools/publish_release.py": {
+      "source": "PublicRelease/Tools/publish_release.py",
+      "sha256": "5c908dbd51ec97f3c49dd87b8a33f86d4abc56f3660fa88e3a6550014354be08"
+    },
+    "Tools/check_release_workflow.py": {
+      "source": "PublicRelease/Tools/check_release_workflow.py",
+      "sha256": "29b9b3bedff0bf1fb297a68376fec738bf0f6e1e2075c1d93c1c970f7b47c4ed"
     }
   },
   "private_evidence_exported": false,
   "committed": false,
-  "published": false
+  "published": false,
+  "public_owned": [
+    "ResearchSource/capture_probe.c",
+    "ResearchSource/formation_probe.c",
+    "ResearchSource/inventory_probe.c",
+    "ResearchSource/inventory_reader.h",
+    "ResearchSource/replacement_probe.c",
+    "Tests/capture_diagnostic_harness.c",
+    "Tests/capture_probe_harness.c",
+    "Tests/core_observation_harness.c",
+    "Tests/default_fallback_harness.c",
+    "Tests/default_fallback_sdk_harness.c",
+    "Tests/formation_probe_harness.c",
+    "Tests/inventory_harness.c",
+    "Tests/replacement_adapter_harness.c",
+    "Tests/replacement_command_harness.c",
+    "Tests/replacement_observation_harness.c",
+    "Tests/replacement_probe_harness.c",
+    "Tests/replacement_transaction_harness.c",
+    "Tests/uss_attach_attribution_harness.c",
+    "Tests/uss_automatic_retained_harness.c",
+    "Tests/uss_gameplay_application_harness.c",
+    "Tests/uss_gameplay_loop_harness.c",
+    "Tests/uss_lua_menu_bridge_harness.c",
+    "Tests/uss_policy_attribution_harness.c",
+    "Tests/uss_recovery_interruption_harness.c",
+    "Tests/uss_solo_harness.c",
+    "Tests/uss_vpm_windows_harness.c",
+    "src/attachment_entry_pin.h",
+    "src/capture_diagnostic.h",
+    "src/formation_native.h",
+    "src/normal_gameplay.c",
+    "src/replacement_command.h",
+    "src/uss_gameplay_application.h",
+    "src/uss_gameplay_loop.h",
+    "src/uss_gameplay_windows.h",
+    "src/uss_lua_menu_mailbox.h",
+    "src/uss_menu_diagnostics.h",
+    "src/uss_menu_ui_policy.h",
+    "src/uss_native_menu_entries.h",
+    "src/uss_player_control.h",
+    "src/uss_player_input_sdk.h",
+    "src/uss_recovery.h",
+    "src/uss_recovery_native.h",
+    "src/uss_recovery_reader.h",
+    "src/uss_recovery_runtime.h",
+    "src/uss_settings.h",
+    "src/uss_vpm_menus.h",
+    "src/uss_vpm_windows.h"
+  ],
+  "excluded": [
+    "COMPANION.md",
+    "Companion/uss_lua_menu_bridge.lua",
+    "ResearchSource/selection_probe.c",
+    "Tests/selection_control_harness.c",
+    "Tests/selection_probe_harness.c",
+    "Tools/build_companion.py",
+    "src/selection_control.h"
+  ]
 }

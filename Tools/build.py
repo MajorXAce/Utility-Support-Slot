@@ -1,12 +1,15 @@
 """Build/package USS from public source. No install, launch, tag or publication."""
-import argparse,json,os,shutil,subprocess,sys,hashlib,zipfile
+import argparse,json,os,shutil,subprocess,sys,hashlib,zipfile,re
+from player_package import archive_bytes
 from pathlib import Path
 from sdk_inputs import ROOT,validate_inputs,sha
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--compiler',choices=['msvc','zig'],default='msvc')
-    parser.add_argument('--test',action='store_true');parser.add_argument('--package',action='store_true')
-    args=parser.parse_args();baseline,sdk,zig=validate_inputs()
+    parser.add_argument('--test',action='store_true');parser.add_argument('--package',action='store_true');parser.add_argument('--candidate',help='Distinct local review output label; does not change the release version')
+    args=parser.parse_args()
+    if args.candidate and not re.fullmatch(r'[a-zA-Z0-9_-]+',args.candidate):parser.error('Invalid candidate label')
+    baseline,sdk,zig=validate_inputs()
     if args.compiler=='msvc' and not shutil.which('cl.exe'):
         vswhere=Path(os.environ.get('ProgramFiles(x86)','C:/Program Files (x86)'))/'Microsoft Visual Studio/Installer/vswhere.exe'
         if not vswhere.is_file():raise RuntimeError('Install Visual Studio C++ Build Tools; see BUILDING.md')
@@ -35,16 +38,10 @@ def main():
     receipt={'version':version,'compiler':args.compiler,'dll_sha256':sha(dll),'source_sha256':files,'sdk_headers':baseline['headers'],'command':command,'installed':False,'live_tested_by_build':False}
     (out/'build-receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
     if args.package:
-        dist=ROOT/'dist';dist.mkdir(exist_ok=True);package=dist/('Utility-Support-Slot-v'+version+'.zip')
-        names=['hellforge-mod.json','icon.png','LICENSE','THIRD_PARTY_LICENSES.txt','README.md',dll.name]  # release_notes.md stays in the repo: the release workflow uses it as the GitHub release text, and a published ZIP can never be corrected
-        import io
-        data=io.BytesIO()
-        with zipfile.ZipFile(data,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
-            for name in names:
-                path=dll if name==dll.name else ROOT/name
-                info=zipfile.ZipInfo(name,(1980,1,1,0,0,0));info.compress_type=zipfile.ZIP_DEFLATED;info.external_attr=0o100644<<16
-                z.writestr(info,path.read_bytes())
-        payload=data.getvalue()
+        dist=ROOT/'dist';dist.mkdir(exist_ok=True)
+        suffix='-'+args.candidate if args.candidate else ''
+        package=dist/('Utility-Support-Slot-v'+version+suffix+'.zip')
+        payload=archive_bytes(ROOT,dll)
         if package.exists() and package.read_bytes()!=payload:raise RuntimeError('Preserve immutable ZIP: '+str(package))
         package.write_bytes(payload);print(str(package)+' SHA256 '+hashlib.sha256(payload).hexdigest())
     return 0

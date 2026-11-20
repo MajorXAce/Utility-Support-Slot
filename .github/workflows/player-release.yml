@@ -3,7 +3,12 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish immediately (leave off to review a draft first)
+        description: Create a release only after explicit final review
+        type: boolean
+        required: true
+        default: false
+      replace_mistaken_v083_tag:
+        description: Replace only the reviewed mistaken v0.8.3 tag at its recorded old commit
         type: boolean
         required: true
         default: false
@@ -16,32 +21,40 @@ jobs:
   release:
     if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Check publication guards without network or Git writes
+        run: python Tools/check_release_workflow.py
       - name: Fetch reviewed public SDK headers
         run: python Tools/sdk_inputs.py --fetch
       - name: Test, build and package
         run: python Tools/build.py --compiler msvc --test --package
-      - name: Package optional Lua menu companion
-        run: python Tools/build_companion.py --package
+      - name: Verify player package
+        id: package
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          $asset = "dist/Utility-Support-Slot-v$version.zip"
+          python Tools/check_package.py $asset
+          if ($LASTEXITCODE -ne 0) { throw "Package validation failed" }
+          "asset=$asset" >> $env:GITHUB_OUTPUT
       - uses: actions/upload-artifact@v4
         with:
           name: Utility-Support-Slot
-          path: dist/*.zip
+          path: ${{ steps.package.outputs.asset }}
+          if-no-files-found: error
       - name: Create release
+        if: inputs.publish
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          PUBLISH_RELEASE: ${{ inputs.publish }}
+          REPLACE_MISTAKEN_TAG: ${{ inputs.replace_mistaken_v083_tag }}
         run: |
-          $version = (Get-Content VERSION -Raw).Trim()
-          $tag = "v$version"
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists; preserve its files." }
-          $releaseArgs = @('release', 'create', $tag, "dist/Utility-Support-Slot-v$version.zip", "dist/Utility-Support-Slot-Lua-Menu-Companion-v$version.zip", '--target', '${{ github.sha }}', '--title', "Utility Support Slot $version", '--notes-file', 'release_notes.md')
-          if ($env:PUBLISH_RELEASE -ne 'true') { $releaseArgs += '--draft' }
-          & gh @releaseArgs
-          if ($LASTEXITCODE -ne 0) { throw 'Release creation failed' }
+          $releaseArgs = @('Tools/publish_release.py', '--publish')
+          if ($env:REPLACE_MISTAKEN_TAG -eq 'true') { $releaseArgs += '--replace-mistaken-v083' }
+          python @releaseArgs
+          if ($LASTEXITCODE -ne 0) { throw 'Release preparation or publication failed; inspect current tag/release state before retrying.' }

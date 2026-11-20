@@ -106,7 +106,7 @@ static inline int uss_player_sdk_sample(void* user,const UssCoreObservation* cur
         !get_ptr(&memory,source->base+0x3326d20,&again_manager) || manager!=again_manager || support>1 ||
         !player_sdk_ui(source,&clear) || !clear || !source->foreground(source->input_user) ||
         !player_sdk_scope(source) || source->base!=sampled_base || source->size!=sampled_size)return 0;
-    if(source->settings->current.mode==USS_BIND_DEDICATED &&
+    if(uss_settings_effective_mode(source->settings)==USS_BIND_DEDICATED && !source->settings->mode_change_pending &&
         (!source->dedicated || !source->dedicated(source->input_user,&source->settings->current,&result.dedicated_down)))return 0;
     result.known=result.foreground=result.ui_clear=1;result.manager=manager;
     result.support_pressed=support;result.cycle_held=u32(cycle+4);*output=result;return 1;
@@ -126,7 +126,7 @@ static inline int uss_player_sdk_managed_pending(UssPlayerInputSdk* source,unsig
     if(!current->valid || !current->mission || !current->primary.valid || action->index>=8 ||
         action->avatar!=source->runtime->life.owner.context.local.avatar || !action->manager ||
         action->record!=action->manager+0x53dcd0+(uintptr_t)action->index*0x1238)return 0;
-    if(source->settings->current.mode==USS_BIND_DEDICATED &&
+    if(uss_settings_effective_mode(source->settings)==USS_BIND_DEDICATED && !source->settings->mode_change_pending &&
         current->inventory.slots[2]!=source->runtime->life.owner.utility.entity)return 0;
     memory.api=source->api;memory.slot=-1;
     at=action->manager+0x150+(uintptr_t)action->index*0xa7aec+0x1b68+24*32;

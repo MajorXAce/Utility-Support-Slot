@@ -1,5 +1,5 @@
 /* Menu bridge harness: the REAL mailbox, arbiter, provider-neutral handover policy and diagnostics composed exactly as the call site composes them.
- * Authored fakes: the clock, the C provider's sample stream, the native tab-bar reads. Not covered here: the Lua companion's own Lua code (tested separately by Tools/check_uss_lua_companion.py), real LuaJIT/ffi, real provider menus, the native chrome (Tests/menu_compat_087_mom_step_test.c covers the standalone/MOM tab rule). */
+ * Authored fakes: the clock, the C provider's sample stream, the native tab-bar reads. Not covered here: real LuaJIT execution or real provider menus, the native chrome (Tests/menu_compat_087_mom_step_test.c covers the standalone/MOM tab rule). */
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>

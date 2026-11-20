@@ -1,4 +1,4 @@
-#define USS_REPLACEMENT_OBSERVATION_TEST_MAIN hf050_observation_regression_checks
+#define USS_REPLACEMENT_OBSERVATION_TEST_MAIN replacement_observation_regression_checks
 #include "replacement_observation_harness.c"
 #include "../src/replacement_adapter.h"
 static const unsigned char fixture_select_state[64]={0x4c,0x8b,0xdc,0x55,0x57,0x48,0x8b,0xec,0x48,0x83,0xec,0x78,0x48,0x8b,0x05,0x6d,0x81,0xba,0x01,0x48,0x33,0xc4,0x48,0x89,0x45,0xe0,0x8b,0x01,0x48,0x8b,0xf9,0x49,0x89,0x5b,0x10,0x33,0xdb,0x3b,0x05,0x65,0xfd,0x9e,0x02,0x49,0x89,0x73,0x18,0x8b,0xf2,0x4d,0x89,0x63,0x20,0x4d,0x89,0x6b,0xe8,0x4d,0x89,0x73,0xe0,0x4c,0x8b,0x35};
@@ -42,7 +42,7 @@ static int own_invoke(void* user,UssReplacementEffect effect,uintptr_t first,uin
         result=uss_drop_support_slot(&calls,(void*)inventory,avatar);}
     else {assert(effect==USS_REPLACEMENT_SEND && first==BASE+0xBE3F40 && message);calls.send_inventory=own_send;result=uss_send_inventory(&calls,message);}
     if(mode==4)fail_at=reads+1;
-    if(mode==5)++hf048_history.last_serial;
+    if(mode==5)++replacement_history_fixture.last_serial;
     return result==USS_CALL_RETURNED && mode!=2;
 }
 static void adapter_fixture(unsigned utility,unsigned pickup,unsigned selected,unsigned role)
@@ -69,7 +69,7 @@ static UssReplacementPhase adapter_complete(void)
 int USS_REPLACEMENT_ADAPTER_TEST_MAIN(void)
 {
     unsigned utility,pickup,selected,role,total,i,mode,baseline_kinds[40];
-    assert(hf050_observation_regression_checks()==0);
+    assert(replacement_observation_regression_checks()==0);
     adapter_fixture(1,0,1,HF_SESSION_HOST);assert(adapter_complete()==USS_REPLACE_COMPLETE);
     assert(replacement_work.real==102 && candidate_life.phase==USS_LIFE_FORMED);
     total=effect_calls;memcpy(baseline_kinds,effect_kind,sizeof(effect_kind));

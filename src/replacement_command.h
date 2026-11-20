@@ -1,4 +1,4 @@
-/* HF052 controlled host experiment. No automatic input/pickup discovery. */
+/* Controlled replacement diagnostic. No automatic input/pickup discovery. */
 #ifndef USS_REPLACEMENT_COMMAND_H
 #define USS_REPLACEMENT_COMMAND_H
 #include "formation_command.h"
@@ -32,7 +32,7 @@ static inline int uss_replacement_request_valid(const UssFormationTicket* ticket
             !command_request->incoming && !memcmp(command_request->identity,zero,8));
 }
 /* Explicit production invoker. Construction/startup does not call it. Every
- * address comes from HF051's checked entry; no independent address discovery. */
+ * address comes from the replacement adapter's checked entry; no independent address discovery. */
 #include "uss_replacement_invoke.h"
 static UssReplacementProducer replacement_diagnostic_producer(UssReplacementDiagnostic* d,UssFormationNative* native)
 {

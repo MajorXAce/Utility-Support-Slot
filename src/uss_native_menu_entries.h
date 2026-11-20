@@ -1,5 +1,5 @@
 /* Exact Options entry contracts from CowboyBingus ModOptionsMenu (0BSD).
- * Retained-image matches recorded in HF055; not loaded-process acceptance.
+ * Retained-image matches recorded in the offline entry review; not loaded-process acceptance.
  * Only resolve on the owning thread with current build/module/context validation. */
 #ifndef USS_NATIVE_MENU_ENTRIES_H
 #define USS_NATIVE_MENU_ENTRIES_H

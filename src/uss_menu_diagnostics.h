@@ -15,7 +15,7 @@
 #include "uss_menu_ui_policy.h"
 #include "uss_native_menu_observation.h"
 
-enum { USS_MENU_DIAG_MAX_LINES = 48, USS_MENU_DIAG_LINE = 320 };
+enum { USS_MENU_DIAG_MAX_LINES = 48, USS_MENU_DIAG_LINE = 384 };
 #define USS_MENU_TEMPLATE_LABEL UINT32_C(0xc67c7faf)   /* the label USS and the original Mod Options Menu both use for a text-only tab */
 typedef void (*UssMenuDiagLog)(void* user, const char* line);
 
@@ -24,13 +24,19 @@ typedef struct UssMenuProviderDiag {
     unsigned source, external, options, bindings;
     char c_status[24], lua_status[24];
 } UssMenuProviderDiag;
+typedef struct UssMenuFallbackDiag {
+    unsigned active,configured,effective,source,usable,c_present,lua_present,c_options,c_bindings,lua_options,lua_bindings;
+    char standalone[40],c_status[32],lua_status[32];
+} UssMenuFallbackDiag;
 typedef struct UssMenuDiagnostics {
+    UssMenuFallbackDiag last_fallback;unsigned fallback_have,fallback_lines,fallback_capped,fallback_exit_summary;
     UssMenuUiPolicy last_ui;unsigned have_ui,ui_usable;
     UssMenuProviderDiag last; unsigned have_last;
     unsigned lines, capped, open_reported, generation;
 } UssMenuDiagnostics;
 /* What one opening shows. tab_count 0 means the host could not be observed. */
 typedef struct UssMenuOpenEvidence {
+    unsigned selected_tab,shown_content,shown_category;
     unsigned observed, tab_count, uss_tab, template_at_3, foreign_template_tab, rows_intact, ownership_lost, language_changing, topmost;
 } UssMenuOpenEvidence;
 
@@ -48,6 +54,26 @@ static inline void uss_menu_diag_emit(UssMenuDiagnostics* d, UssMenuDiagLog log,
         return;
     }
     ++d->lines; log(user, line);
+}
+/* Fallback has a reserved budget in the same diagnostic service. Exhausting
+ * ordinary UI diagnostics cannot hide its first activation. */
+static inline void uss_menu_diag_fallback(UssMenuDiagnostics* d,UssMenuDiagLog log,void* user,const UssMenuFallbackDiag* now)
+{
+    char line[640];unsigned previous,was;
+    if(!d || !log || !now || (d->fallback_have && !memcmp(&d->last_fallback,now,sizeof *now)))return;
+    was=d->fallback_have && d->last_fallback.active;previous=d->fallback_have?d->last_fallback.effective:now->configured;
+    d->last_fallback=*now;d->fallback_have=1;
+    if(!was && !now->active)return;
+    snprintf(line,sizeof line,"USS Default gameplay fallback %s prior=%u configured=%u effective=%u standalone=%s source=%s usable=%u c_present=%u c_options=%u c_bindings=%u c_status=%s lua_present=%u lua_options=%u lua_bindings=%u lua_status=%s native_guards=unchanged",
+        !now->active?"recovery":was?"reason-change":"start",previous,now->configured,now->effective,now->standalone,uss_menu_source_name(now->source),now->usable,
+        now->c_present,now->c_options,now->c_bindings,now->c_status,now->lua_present,now->lua_options,now->lua_bindings,now->lua_status);
+    if(d->fallback_lines>=16){
+        if(!d->fallback_capped){d->fallback_capped=1;log(user,"USS Default gameplay fallback: log cap reached; further reason changes suppressed; one recovery summary reserved");}
+        if(!now->active && was && !d->fallback_exit_summary){d->fallback_exit_summary=1;log(user,line);}
+        return;
+    }
+    ++d->fallback_lines;
+    log(user,line);
 }
 /* Short fixed status of the Lua companion for the provider line. `last_rejected` is a UssLuaPostResult; names are literals so they can be compared by value. */
 static inline const char* uss_menu_diag_lua_status(unsigned accepted, unsigned rejected, unsigned last_rejected, int posting_now)
@@ -111,6 +137,7 @@ static inline void uss_menu_diag_collect(const UssMenuObservationIo* io, const U
     unsigned i; uint32_t label;
     memset(out, 0, sizeof *out); out->uss_tab = UINT32_MAX;
     if (!io || !io->read || !host || !host->valid || !host->escape_present || !host->screen) return;
+    out->selected_tab=host->selected_tab;out->shown_content=host->tab;out->shown_category=host->category;
     out->observed = 1; out->tab_count = host->tab_count; out->uss_tab = host->uss_tab; out->ownership_lost = host->foreign_owner;
     out->language_changing = host->language_changing; out->topmost = host->topmost; out->rows_intact = host->ours_intact;
     for (i = 0; i < host->tab_count && i < 8; ++i) {
@@ -127,9 +154,9 @@ static inline int uss_menu_diag_open(UssMenuDiagnostics* d, UssMenuDiagLog log, 
     if (!d || !e || d->open_reported) return 0;
     d->open_reported = 1; ++d->generation;
     if (e->uss_tab == UINT32_MAX) snprintf(uss_tab, sizeof uss_tab, "none"); else snprintf(uss_tab, sizeof uss_tab, "%u", e->uss_tab);
-    snprintf(line, sizeof line, "USS menu open gen=%u case=%s owner=%s external=%u tabs=%u uss_tab=%s template_at_3=%u foreign_template_tab=%u rows_intact=%u outcome=%s",
+    snprintf(line, sizeof line, "USS menu open gen=%u case=%s owner=%s external=%u tabs=%u uss_tab=%s template_at_3=%u foreign_template_tab=%u rows_intact=%u selected_tab=%u shown_content=%u shown_category=%u outcome=%s",
         d->generation, uss_menu_diag_case(e, external, provider_wait), uss_menu_source_name(source), external, e->tab_count, uss_tab, e->template_at_3,
-        e->foreign_template_tab, e->rows_intact, outcome ? outcome : "NONE");
+        e->foreign_template_tab, e->rows_intact,e->selected_tab,e->shown_content,e->shown_category, outcome ? outcome : "NONE");
     uss_menu_diag_emit(d, log, user, line);
     return 1;
 }
@@ -141,8 +168,8 @@ static inline void uss_menu_diag_ui(UssMenuDiagnostics* d,UssMenuDiagLog log,voi
     char line[USS_MENU_DIAG_LINE];
     if(!d || !ui || (d->have_ui && !memcmp(&d->last_ui,ui,sizeof *ui) && d->ui_usable==usable))return;
     d->last_ui=*ui;d->have_ui=1;d->ui_usable=usable;
-    snprintf(line,sizeof line,"USS menu UI: lua_options_present=%u companion_fresh=%u usable=%u standalone_deferred=%u close_reopen_required=%u generation=%u",
-        ui->presence,ui->companion_fresh,usable,ui->deferred,ui->close_required,ui->generation);
+    snprintf(line,sizeof line,"USS menu UI: lua_options_present=%u companion_fresh=%u c_options_present=%u usable=%u standalone_deferred=%u close_reopen_required=%u generation=%u",
+        ui->presence,ui->companion_fresh,ui->c_options_present,usable,ui->deferred,ui->close_required,ui->generation);
     uss_menu_diag_emit(d,log,user,line);
 }
 #endif

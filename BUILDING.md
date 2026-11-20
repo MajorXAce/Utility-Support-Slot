@@ -26,10 +26,17 @@ Zig is optional: set USS_ZIG to the reviewed0.17.0 executable and pass
 --compiler zig. The Windows MSVC build does not require Zig.
 
 The manual GitHub release workflow runs the offline checks, builds and packages
-from main, and creates a draft by default. Review its files and notes before
-publishing. Existing version tags are not moved. Lua history and its old workflow
-are preserved on the legacy branch.
+from main, and uploads a review artifact by default. Release creation requires an
+explicit publish input after review. Existing releases and tags are preserved.
+The separate replace_mistaken_v083_tag input permits only the approved v0.8.3
+replacement, and only while its old commit still matches the recorded value.
+A concurrent tag change or an authentication/network failure stops publication.
+Lua history and its old workflow are preserved on the legacy branch.
 
-81 offline suites validate owned fixtures and refusal paths; passing them is not
-in-game or multiplayer proof. Release0.8.0 is based on the gameplay/menu candidate
-accepted during development. Future game builds need a separate compatibility review.
+Offline checks validate authored fixtures and refusal paths; passing them is not
+in-game or multiplayer proof. Future game builds need a separate compatibility review.
+
+The player ZIP contains the native DLL, manifest, icon, README and licences.
+Menu support is built into the DLL; no separate menu add-on or Lua data pack is
+needed. Use --candidate followed by a label to give local test packages distinct
+filenames without changing the version. Release publication is a separate step.

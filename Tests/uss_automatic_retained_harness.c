@@ -12,7 +12,7 @@ static int automatic_own_effect(void* user,UssReplacementEffect effect,uintptr_t
     /* Existing own-engine functions consult these fixture mirrors, never game
      * memory. The actual adapter still owns automatic_runtime/controller. */
     candidate_life=automatic_runtime.life;replacement_work=automatic_controller.replacement;
-    hf048_history=automatic_runtime.history;
+    replacement_history_fixture=automatic_runtime.history;
     return own_invoke(user,effect,first,second,record,inventory,avatar,value,message);
 }
 static int automatic_formation_effect(void* user,UssFormationEffect effect,uintptr_t first,uintptr_t second,

@@ -16,12 +16,11 @@ HellForge's mod manager and enable **Utility Support Slot**. Start or restart th
 game through HellForge's launcher.
 This mod only works for HellForge, not the current live game.
 
-Remove any older USS test build or Lua version from the same setup before enabling
-this version. They should not run together.
+Remove any older USS test build or Lua version before
+enabling this version. They should not run together.
 
 The **Mod Options Menu** and **Mod Bindings Menu**, included in CowboyBingus's
-HellForge Vanilla Plus Megapack, are optional. If either is unavailable, USS uses
-its own menu instead.
+HellForge or Lua Vanilla Plus Megapack, are optional. Without these menus, USS provides its own.
 
 ## Controls
 
@@ -44,10 +43,8 @@ Release the control after changing modes before using it again.
 The menu mods save their settings separately from USS's own menu. If you remove
 them, USS goes back to the settings you used in its own menu.
 
-For the Lua versions of these menus, also install the matching **Lua Menu
-Companion** release ZIP. With Lua menus, **6** remains available until your first
-accepted Utility Weapon binding press. While the identified Lua options menu is
-available, USS leaves settings in that menu instead of adding a competing tab.
+If neither USS's menu nor the optional mod menus can be used, USS uses
+**Default** binding mode. Your saved settings are kept.
 
 ## Pickup and Recovery
 
@@ -61,7 +58,7 @@ like vanilla.
 
 ## Known Limitations and Multiplayer Support
 
-Hosting and joining have been tested with two computers. More players are welcome
+Hosting and joining have been tested with two players. More players are welcome
 to try it and report issues.
 
 - Your primary weapon may briefly appear during weapon changes.

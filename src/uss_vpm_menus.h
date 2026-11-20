@@ -47,6 +47,7 @@ typedef struct UssVpmMenus {
     UssVpmOption option;UssVpmBinding binding;
     uint64_t provider,sequence;
     unsigned option_attempted,binding_attempted,option_registered,binding_registered;
+    int option_result,binding_result;
     const char* reason;
 } UssVpmMenus;
 #define USS_VPM_MODE_ID "majorxace.uss.binding_mode"
@@ -54,9 +55,16 @@ typedef struct UssVpmMenus {
 /* Version1 may append fields; USS reads only this known prefix. Existing
  * function layout and required operations must remain compatible. Unused
  * provider metadata is not an admission condition. */
+/* Options UI presence does not require a bindings component or successful
+ * USS registration. Only the negotiated, known options prefix qualifies. */
+static inline int uss_vpm_options_valid(const UssVpmOptionsApi* options)
+{
+    return options && options->version==1 && options->size>=sizeof(UssVpmOptionsApi) &&
+        options->register_option && options->get && options->ready;
+}
 static inline int uss_vpm_tables_valid(const UssVpmOptionsApi* options,const UssVpmBindingsApi* bindings)
 {
-    return options && bindings && options->version==1 && options->size>=sizeof(UssVpmOptionsApi) &&
+    return uss_vpm_options_valid(options) && bindings &&
         bindings->version==1 && bindings->size>=sizeof(UssVpmBindingsApi) &&
         options->register_option && options->get && options->ready &&
         bindings->register_binding && bindings->down && bindings->ready;
@@ -88,11 +96,13 @@ static inline int uss_vpm_menus_sample(UssVpmMenus* menus,UssMenuProviderSample*
     if(menus->options->ready()!=1 || menus->bindings->ready()!=1){menus->reason="WAIT_READY";return 0;}
     if(!menus->option_attempted){
         menus->option_attempted=1;
-        menus->option_registered=menus->options->register_option(USS_VPM_MODE_ID,&menus->option,&error)==1;
+        menus->option_result=menus->options->register_option(USS_VPM_MODE_ID,&menus->option,&error);
+        menus->option_registered=menus->option_result==1;
     }
     if(!menus->binding_attempted){
         menus->binding_attempted=1;
-        menus->binding_registered=menus->bindings->register_binding(USS_VPM_BINDING_ID,&menus->binding,&error)==1;
+        menus->binding_result=menus->bindings->register_binding(USS_VPM_BINDING_ID,&menus->binding,&error);
+        menus->binding_registered=menus->binding_result==1;
     }
     if(!menus->option_registered || !menus->binding_registered){menus->reason="REGISTRATION_REFUSED";return 0;}
     if(menus->options->get(USS_VPM_MODE_ID,&mode)!=1 || (mode!=1.0 && mode!=2.0)){

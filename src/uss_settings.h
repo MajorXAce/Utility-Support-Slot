@@ -17,7 +17,20 @@ typedef struct UssSettingsState {
     UssSettings current,pending;
     uint64_t revision,provider;
     unsigned pending_present,external,release_required;
+    unsigned default_fallback,mode_change_pending,mode_release_required; /* Effective input only; never serialized or saved. */
 } UssSettingsState;
+/* Configuration stays intact while unavailable settings routes use normal
+ * support controls. Input authority changes at a transaction-free boundary. */
+static inline unsigned uss_settings_effective_mode(const UssSettingsState* state)
+{ return state->default_fallback?USS_BIND_DEFAULT:state->current.mode; }
+static inline int uss_settings_fallback(UssSettingsState* state,unsigned wanted,unsigned busy)
+{
+    wanted=wanted!=0;state->mode_change_pending=wanted!=state->default_fallback;
+    if(!state->mode_change_pending)return 0;
+    state->release_required=1;
+    if(busy || state->revision==UINT64_MAX)return 0;
+    state->default_fallback=wanted;state->mode_change_pending=0;state->mode_release_required=1;++state->revision;return 1;
+}
 typedef struct UssMenuConnection {
     uint64_t provider; /* Identity changes when a menu/bridge instance is replaced. */
     unsigned options_registered,bindings_registered,subscribed,values_valid;

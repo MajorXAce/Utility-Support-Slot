@@ -23,7 +23,7 @@ static void observation_fixture(unsigned utility,unsigned pickup,unsigned select
     replacement_fixture(utility,pickup,selected,role);
     memset(&observation_producer,0,sizeof(observation_producer));
     observation_producer.api=&fake;observation_producer.mod=MOD;observation_producer.platform=base.platform;
-    observation_producer.life=&candidate_life;observation_producer.history=&hf048_history;
+    observation_producer.life=&candidate_life;observation_producer.history=&replacement_history_fixture;
     observation_producer.flags=&core_flags;observation_producer.work=&replacement_work;
     observation_producer.origin=&observed_origin;observation_producer.clock_ms=observation_clock;
     observation_clock_calls=observation_mutate=0;

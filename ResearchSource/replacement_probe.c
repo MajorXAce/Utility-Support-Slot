@@ -1,4 +1,4 @@
-/* HF052: finite formation plus one explicitly named replacement. */
+/* Finite formation plus one explicitly named replacement. */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <bcrypt.h>
@@ -26,7 +26,7 @@ static int prototype_path(wchar_t* out,const wchar_t* name)
 static void prototype_stop(const char* reason)
 {
     prototype_terminal=1;
-    prototype_api->log(prototype_mod,"HF052 TERMINAL reason=%s sequence=%u formation_effects=%u replacement_effects=%u replacement_stage=%u no_retry=1",reason,prototype_sequence,prototype_native.effects,prototype_replacement.adapter.effects,prototype_replacement.work.stage);
+    prototype_api->log(prototype_mod,"USS replacement probe TERMINAL reason=%s sequence=%u formation_effects=%u replacement_effects=%u replacement_stage=%u no_retry=1",reason,prototype_sequence,prototype_native.effects,prototype_replacement.adapter.effects,prototype_replacement.work.stage);
 }
 static int prototype_request(UssReplacementRequest* command_request)
 {
@@ -51,7 +51,7 @@ static void prototype_tick(HfMod* mod,float dt,void* user)
             &prototype_runtime.history,&prototype_runtime.publication,&prototype_replacement.services,now,now);
         if(replaced==USS_REPLACE_CANCELLED){prototype_stop(prototype_replacement.work.reason);goto done;}
         if(replaced==USS_REPLACE_COMPLETE)prototype_api->log(prototype_mod,
-            "HF052 REPLACEMENT_COMPLETE sequence=%u support=%u active=%u pair_generation=%llu effects=%u sends=%llu",
+            "USS replacement probe REPLACEMENT_COMPLETE sequence=%u support=%u active=%u pair_generation=%llu effects=%u sends=%llu",
             prototype_sequence-1,prototype_replacement.work.real,prototype_replacement.work.selected,
             (unsigned long long)prototype_runtime.life.owner.pair_generation,prototype_replacement.adapter.effects,
             (unsigned long long)prototype_runtime.publication.returned);
@@ -60,7 +60,7 @@ static void prototype_tick(HfMod* mod,float dt,void* user)
     if(prototype_runtime.work.phase==USS_PAIR_ACTIVE){
         phase=uss_formation_tick(&prototype_runtime);
         if(phase==USS_PAIR_CANCELLED){prototype_stop(prototype_runtime.reason);goto done;}
-        if(phase==USS_PAIR_COMPLETE)prototype_api->log(prototype_mod,"HF052 COMPLETE sequence=%u support=%u active=%u effects=%u sends=%llu",
+        if(phase==USS_PAIR_COMPLETE)prototype_api->log(prototype_mod,"USS replacement probe COMPLETE sequence=%u support=%u active=%u effects=%u sends=%llu",
             prototype_sequence-1,prototype_runtime.work.real,prototype_runtime.work.selected,prototype_native.effects,
             (unsigned long long)prototype_runtime.publication.returned);
         goto done;
@@ -79,7 +79,7 @@ static void prototype_tick(HfMod* mod,float dt,void* user)
     }
     if(!uss_replacement_diagnostic_command(&prototype_replacement,&prototype_native,&command_request,replacement_runtime_invoke,NULL)){
         /* Report already collected evidence only: never read again after refusal. */
-        prototype_api->log(prototype_mod,"HF052 COMMAND_REFUSED request_sequence=%u action=%u detail=%s core_valid=%u mission=%u role=%u primary_valid=%u primary_ready=%u active=%u support=%u support_class=%u life_phase=%u remembered=%u bundle_valid=%u decision=%u",
+        prototype_api->log(prototype_mod,"USS replacement probe COMMAND_REFUSED request_sequence=%u action=%u detail=%s core_valid=%u mission=%u role=%u primary_valid=%u primary_ready=%u active=%u support=%u support_class=%u life_phase=%u remembered=%u bundle_valid=%u decision=%u",
             command_request.base.sequence,command_request.base.action,prototype_runtime.reason?prototype_runtime.reason:"UNSET",
             prototype_runtime.latest.valid,prototype_runtime.latest.mission,prototype_runtime.latest.context.role,
             prototype_runtime.latest.primary.valid,prototype_runtime.latest.primary.ready,prototype_runtime.latest.inventory.active_selector,
@@ -88,11 +88,11 @@ static void prototype_tick(HfMod* mod,float dt,void* user)
         prototype_stop("COMMAND_CONTEXT_OR_ORDER_REFUSED");goto done;}
     if(command_request.base.action==USS_COMMAND_STATUS){
         const unsigned char* id=prototype_replacement.status.identity;
-        prototype_api->log(prototype_mod,"HF052 STATUS sequence=%u support=%u identity=%02x%02x%02x%02x%02x%02x%02x%02x active=%u pair_generation=%llu",
+        prototype_api->log(prototype_mod,"USS replacement probe STATUS sequence=%u support=%u identity=%02x%02x%02x%02x%02x%02x%02x%02x active=%u pair_generation=%llu",
             command_request.base.sequence,prototype_replacement.status.entity,id[0],id[1],id[2],id[3],id[4],id[5],id[6],id[7],
             prototype_runtime.latest.inventory.active_selector,(unsigned long long)prototype_runtime.life.owner.pair_generation);
     }
-    prototype_api->log(prototype_mod,"HF052 ACCEPTED sequence=%u action=%u phase=%u unit=%u avatar=%u support=%u effects=%u policy=OPERATOR_STANDING_NO_INPUT",
+    prototype_api->log(prototype_mod,"USS replacement probe ACCEPTED sequence=%u action=%u phase=%u unit=%u avatar=%u support=%u effects=%u policy=OPERATOR_STANDING_NO_INPUT",
         command_request.base.sequence,command_request.base.action,prototype_runtime.work.phase,prototype_runtime.latest.inventory.local_unit,
         prototype_runtime.latest.inventory.avatar,prototype_runtime.latest.inventory.slots[2],prototype_native.effects);
     prototype_next=now+25;
@@ -127,9 +127,9 @@ HF_MOD_EXPORT int hellforge_mod_init(const HfApi* api,HfMod* mod)
         !api->read || !api->module_base || !api->session || !api->build_id || !api->game_state || !api->logs_folder)return 1;
     build=api->build_id();if(!build || strcmp(build,"25480438"))return 1;
     prototype_api=api;prototype_mod=mod;
-    if(!prototype_prepare(api,mod)){api->log(mod,"HF052 TERMINAL platform initialization refused native_calls=0");return 0;}
+    if(!prototype_prepare(api,mod)){api->log(mod,"USS replacement probe TERMINAL platform initialization refused native_calls=0");return 0;}
     if(!api->on_game_thread(mod,prototype_tick,NULL)){prototype_stop("CALLBACK_REGISTRATION");return 0;}
-    api->log(mod,"HF052 WAIT_REQUEST version=" USS_REPLACEMENT_VERSION_TEXT " pid=%u started=%llu sdk=%u build=25480438 native_calls=0 automatic_pickups=0 input_bindings=0",
+    api->log(mod,"USS replacement probe WAIT_REQUEST version=" USS_REPLACEMENT_VERSION_TEXT " pid=%u started=%llu sdk=%u build=25480438 native_calls=0 automatic_pickups=0 input_bindings=0",
         prototype_ticket.pid,(unsigned long long)prototype_ticket.process_started,api->version);
     return 0;
 }

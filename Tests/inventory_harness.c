@@ -183,7 +183,7 @@ int main(void)
         for(i=0;i<2;++i) {
             metadata.entity=i?0:5;
             setup();assert(hellforge_mod_init(&fake,MOD)==0);listener(MOD,&metadata.info,NULL);
-            assert(strstr(last_log,"HF019 OBSERVED") && strstr(last_log,"avatar=22 slots=101,"));
+            assert(strstr(last_log,"USS inventory probe OBSERVED") && strstr(last_log,"avatar=22 slots=101,"));
             assert(strstr(last_log,"scope=LOCAL_INVENTORY event_binding=UNVERIFIED"));
             assert(strstr(last_log,i?"event_entity=0 ":"event_entity=5 "));
             total=reads;listener(MOD,&metadata.info,NULL);assert(reads==total && logs==1);

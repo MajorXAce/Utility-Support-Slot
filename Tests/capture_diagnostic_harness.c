@@ -58,7 +58,7 @@ int USS_DIAGNOSTIC_TEST_MAIN(void)
     before=reads;request_present=0;diagnostic_now+=250;
     uss_capture_diagnostic_tick(&control,&fake,MOD,&services);assert(reads==before && identity_writes==1 && !control.terminal);
     request_present=1;prepare_full_request();uss_capture_diagnostic_tick(&control,&fake,MOD,&services);
-    assert(control.terminal && strstr(last_log,"HF034 TERMINAL OBSERVED") && strstr(last_log,"core_lifetime_proven=0"));
+    assert(control.terminal && strstr(last_log,"USS capture probe TERMINAL OBSERVED") && strstr(last_log,"core_lifetime_proven=0"));
     before=reads;uss_capture_diagnostic_tick(&control,&fake,MOD,&services);assert(reads==before && logs==2);
     for(i=1;i<=total;++i) {
         control=diagnostic_fixture(&services);fail_at=i;

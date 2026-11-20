@@ -87,17 +87,17 @@ HF_MOD_EXPORT int hellforge_mod_init(const HfApi* api,HfMod* mod)
 {
     const char* build;
     if(!api || !mod || !uss_sdk_compatible(api) || !api->log)return 1;
-    if(!HF_USS_CAPTURE_ENABLED){api->log(mod,"HF034 inactive");return 0;}
+    if(!HF_USS_CAPTURE_ENABLED){api->log(mod,"USS capture probe inactive");return 0;}
     if(!api->on_game_thread || !api->read || !api->module_base || !api->session ||
         !api->build_id || !api->game_state || !api->logs_folder)return 1;
     build=api->build_id();if(!build || strcmp(build,"25480438"))return 1;
-    if(!capture_prepare_platform(api,mod)){api->log(mod,"HF034 REFUSED platform initialization");return 0;}
+    if(!capture_prepare_platform(api,mod)){api->log(mod,"USS capture probe REFUSED platform initialization");return 0;}
     capture_api=api;atomic_store_explicit(&capture_enabled,1,memory_order_release);
     if(!api->on_game_thread(mod,capture_tick,NULL)) {
         atomic_store_explicit(&capture_enabled,0,memory_order_release);
-        api->log(mod,"HF034 TERMINAL registration failed; staying loaded/no retry");return 0;
+        api->log(mod,"USS capture probe TERMINAL registration failed; staying loaded/no retry");return 0;
     }
-    api->log(mod,"HF034 WAIT_REQUEST version=" USS_CAPTURE_VERSION_TEXT " pid=%u started=%llu sdk=%u build=25480438 automatic_capture=0 native_calls=0 scope=CANDIDATE_PAIR",
+    api->log(mod,"USS capture probe WAIT_REQUEST version=" USS_CAPTURE_VERSION_TEXT " pid=%u started=%llu sdk=%u build=25480438 automatic_capture=0 native_calls=0 scope=CANDIDATE_PAIR",
         capture_control.session.pid,(unsigned long long)capture_control.session.process_started,api->version);
     return 0;
 }

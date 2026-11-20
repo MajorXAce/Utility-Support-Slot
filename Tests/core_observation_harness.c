@@ -108,7 +108,7 @@ int USS_CORE_TEST_MAIN(void)
 {
     UssCoreObservation current,stale;UssPairObservation pair;UssPublicationView view;UssPublicationOwner row;
     uint64_t generation,guard;unsigned total,i;unsigned char* b;
-    /* Existing standalone coordinator behavior has its own HF041 fixture. */
+    /* Existing standalone coordinator behavior has its own formation-runtime fixture. */
     (void)uss_pair_begin;(void)uss_pair_tick;
     assert(producer_regression_checks()==0);
     core_fixture();core_pair();current=core_read();

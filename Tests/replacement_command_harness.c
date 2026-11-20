@@ -13,7 +13,7 @@ static void diagnostic_fixture(void)
 {
     adapter_fixture(1,0,1,HF_SESSION_HOST);memset(&diagnostic,0,sizeof(diagnostic));memset(&diagnostic_runtime,0,sizeof(diagnostic_runtime));
     diagnostic_runtime.life=candidate_life;diagnostic_runtime.life.phase=USS_LIFE_FORMED;memset(&diagnostic_runtime.life.plan,0,sizeof(diagnostic_runtime.life.plan));
-    diagnostic_runtime.history=hf048_history;diagnostic_runtime.history.last_serial=0;
+    diagnostic_runtime.history=replacement_history_fixture;diagnostic_runtime.history.last_serial=0;
     diagnostic_runtime.policy=core_flags;diagnostic_runtime.thread=7;
     memset(&diagnostic_native,0,sizeof(diagnostic_native));diagnostic_native.api=&fake;diagnostic_native.mod=MOD;
     diagnostic_native.platform=producer().platform;diagnostic_native.runtime=&diagnostic_runtime;diagnostic_native.invoke=diagnostic_formation_invoke;
@@ -58,5 +58,5 @@ int USS_REPLACEMENT_COMMAND_TEST_MAIN(void)
     assert(!diagnostic_command(USS_COMMAND_ORIGIN,4,0));
     /* Merely referencing the production invoker does not call or bind a game target. */
     {int (*invoker)(void*,UssReplacementEffect,uintptr_t,uintptr_t,uintptr_t,uintptr_t,uint32_t,uint32_t,const UssInventoryMessage*)=replacement_runtime_invoke;assert(invoker);}
-    puts("HF052 command: separate80byte schema, fresh origin/status/named intent, real diagnostic path with OWN effects PASS");return 0;
+    puts("replacement command: separate80byte schema, fresh origin/status/named intent, real diagnostic path with OWN effects PASS");return 0;
 }

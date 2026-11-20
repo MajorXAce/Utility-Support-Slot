@@ -38,7 +38,7 @@ typedef struct UssCaptureDiagnosticServices {
 static void capture_diagnostic_refuse(UssCaptureDiagnostic* control,const HfApi* api,HfMod* mod,const char* reason)
 {
     control->terminal=1;
-    api->log(mod,"HF034 TERMINAL REFUSED reason=%s native_calls=0 retry=0 scope=CANDIDATE_PAIR core_lifetime_proven=0",reason);
+    api->log(mod,"USS capture probe TERMINAL REFUSED reason=%s native_calls=0 retry=0 scope=CANDIDATE_PAIR core_lifetime_proven=0",reason);
 }
 static int capture_diagnostic_input(void* user,UssCaptureInput* out)
 {*out=*(const UssCaptureInput*)user;return 1;}
@@ -128,7 +128,7 @@ static void uss_capture_diagnostic_tick(UssCaptureDiagnostic* control,const HfAp
         }
         control->identity=identity;control->identity_valid=1;control->terminal=0;
         capture_identity_hex(identity.utility_identity,utility_hex);capture_identity_hex(identity.ordinary_identity,ordinary_hex);
-        api->log(mod,"HF034 IDENTITY_READY unit=%u avatar=%u utility=%u ordinary=%u utility_identity=%s ordinary_identity=%s reads=%u bytes=%u capture_run=0 native_calls=0 next=SEPARATE_CAPTURE_CUE",
+        api->log(mod,"USS capture probe IDENTITY_READY unit=%u avatar=%u utility=%u ordinary=%u utility_identity=%s ordinary_identity=%s reads=%u bytes=%u capture_run=0 native_calls=0 next=SEPARATE_CAPTURE_CUE",
             identity.local_unit,identity.avatar,identity.utility,identity.ordinary,utility_hex,ordinary_hex,budget.calls,budget.bytes);
         return;
     }
@@ -157,11 +157,11 @@ static void uss_capture_diagnostic_tick(UssCaptureDiagnostic* control,const HfAp
     capture_reader.api=api;capture_reader.mod=mod;capture_reader.platform=services->platform;
     capture_reader.user=&input;capture_reader.input=capture_diagnostic_input;
     if(!uss_capture_publication(&capture_reader,&observation,&budget)) {
-        api->log(mod,"HF034 TERMINAL REFUSED reason=%s stage=%s reads=%u bytes=%u proof_bytes=%zu native_calls=0 retry=0 scope=CANDIDATE_PAIR core_lifetime_proven=0",
+        api->log(mod,"USS capture probe TERMINAL REFUSED reason=%s stage=%s reads=%u bytes=%u proof_bytes=%zu native_calls=0 retry=0 scope=CANDIDATE_PAIR core_lifetime_proven=0",
             budget.failure?budget.failure:"CAPTURE",budget.stage?budget.stage:"NONE",budget.calls,budget.bytes,budget.evidence_size);
         return;
     }
-    api->log(mod,"HF034 TERMINAL OBSERVED role=%u avatar=%u unit=%u primary=%u support=%u utility=%u ordinary=%u wires=%u,%u,%u,%u reads=%u bytes=%u proof_bytes=%zu callback_thread=%u native_calls=0 scope=CANDIDATE_PAIR core_lifetime_proven=0 delivery_proven=0",
+    api->log(mod,"USS capture probe TERMINAL OBSERVED role=%u avatar=%u unit=%u primary=%u support=%u utility=%u ordinary=%u wires=%u,%u,%u,%u reads=%u bytes=%u proof_bytes=%zu callback_thread=%u native_calls=0 scope=CANDIDATE_PAIR core_lifetime_proven=0 delivery_proven=0",
         role.role,observation.key.avatar,input.owner.local_unit,input.owner.slots[0],input.owner.slots[2],
         request.utility,request.ordinary,observation.wires[0],observation.wires[1],observation.wires[2],observation.wires[3],
         budget.calls,budget.bytes,observation.fingerprint_size,thread);

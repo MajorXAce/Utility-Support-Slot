@@ -7,6 +7,7 @@
 #include "uss_vpm_menus.h"
 typedef struct UssVpmWindows {
     HMODULE module;UssVpmMenus menus;
+    unsigned options_present,options_version,options_size;
     uint64_t next_discovery;unsigned attempted;const char* reason;
 } UssVpmWindows;
 /* API getters negotiate version1. Retaining the loaded module keeps its code
@@ -17,7 +18,7 @@ static inline int uss_vpm_windows_discover(UssVpmWindows* adapter,uint64_t now,u
     union {FARPROC raw;const UssVpmBindingsApi* (*get)(uint32_t);} bindings;
     const UssVpmOptionsApi* mom;const UssVpmBindingsApi* mbm;
     if(!adapter)return 0;
-    if(adapter->menus.provider)return 1;
+    if(adapter->menus.provider){adapter->options_present=uss_vpm_options_valid(adapter->menus.options);return 1;}
     if(adapter->attempted==2)return 0;
     if(now<adapter->next_discovery)return 0;
     adapter->next_discovery=now+1000;
@@ -27,8 +28,10 @@ static inline int uss_vpm_windows_discover(UssVpmWindows* adapter,uint64_t now,u
     }
     options.raw=GetProcAddress(adapter->module,"vpm_mom_api");
     bindings.raw=GetProcAddress(adapter->module,"vpm_mbm_api");
-    if(!options.raw || !bindings.raw){adapter->reason="EXPORTS_UNAVAILABLE";adapter->attempted=2;return 0;}
-    mom=options.get(1);mbm=bindings.get(1);
+    if(!options.raw && !bindings.raw){adapter->reason="EXPORTS_UNAVAILABLE";adapter->attempted=2;return 0;}
+    mom=options.raw?options.get(1):NULL;mbm=bindings.raw?bindings.get(1):NULL;
+    adapter->options_present=uss_vpm_options_valid(mom);
+    adapter->options_version=adapter->options_present?mom->version:0;adapter->options_size=adapter->options_present?mom->size:0;
     if(!mom || !mbm){adapter->reason="WAIT_API";return 0;}
     if(!uss_vpm_menus_bind(&adapter->menus,mom,mbm,(uint64_t)(uintptr_t)adapter->module,mode)){
         adapter->reason="API_UNAVAILABLE";adapter->attempted=2;return 0;

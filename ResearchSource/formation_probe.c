@@ -1,4 +1,4 @@
-/* HF049: explicit finite formation/draw commands, idle until a fresh command_request. */
+/* Explicit finite formation/draw commands; idle until a fresh command request. */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <bcrypt.h>
@@ -25,7 +25,7 @@ static int prototype_path(wchar_t* out,const wchar_t* name)
 static void prototype_stop(const char* reason)
 {
     prototype_terminal=1;
-    prototype_api->log(prototype_mod,"HF049 TERMINAL reason=%s sequence=%u effects=%u no_retry=1",reason,prototype_sequence,prototype_native.effects);
+    prototype_api->log(prototype_mod,"USS formation probe TERMINAL reason=%s sequence=%u effects=%u no_retry=1",reason,prototype_sequence,prototype_native.effects);
 }
 static int prototype_request(UssFormationRequest* command_request)
 {
@@ -48,7 +48,7 @@ static void prototype_tick(HfMod* mod,float dt,void* user)
     if(prototype_runtime.work.phase==USS_PAIR_ACTIVE){
         phase=uss_formation_tick(&prototype_runtime);
         if(phase==USS_PAIR_CANCELLED){prototype_stop(prototype_runtime.reason);goto done;}
-        if(phase==USS_PAIR_COMPLETE)prototype_api->log(prototype_mod,"HF049 COMPLETE sequence=%u support=%u active=%u effects=%u sends=%llu",
+        if(phase==USS_PAIR_COMPLETE)prototype_api->log(prototype_mod,"USS formation probe COMPLETE sequence=%u support=%u active=%u effects=%u sends=%llu",
             prototype_sequence-1,prototype_runtime.work.real,prototype_runtime.work.selected,prototype_native.effects,
             (unsigned long long)prototype_runtime.publication.returned);
         goto done;
@@ -67,7 +67,7 @@ static void prototype_tick(HfMod* mod,float dt,void* user)
     }
     if(!uss_formation_command(&prototype_native,command_request.action,command_request.switch_on_pickup,command_request.role)){
         prototype_stop("COMMAND_CONTEXT_OR_ORDER_REFUSED");goto done;}
-    prototype_api->log(prototype_mod,"HF049 ACCEPTED sequence=%u action=%u phase=%u unit=%u avatar=%u support=%u effects=%u policy=OPERATOR_STANDING_PRIMARY",
+    prototype_api->log(prototype_mod,"USS formation probe ACCEPTED sequence=%u action=%u phase=%u unit=%u avatar=%u support=%u effects=%u policy=OPERATOR_STANDING_PRIMARY",
         command_request.sequence,command_request.action,prototype_runtime.work.phase,prototype_runtime.latest.inventory.local_unit,
         prototype_runtime.latest.inventory.avatar,prototype_runtime.latest.inventory.slots[2],prototype_native.effects);
     prototype_next=now+25;
@@ -102,9 +102,9 @@ HF_MOD_EXPORT int hellforge_mod_init(const HfApi* api,HfMod* mod)
         !api->read || !api->module_base || !api->session || !api->build_id || !api->game_state || !api->logs_folder)return 1;
     build=api->build_id();if(!build || strcmp(build,"25480438"))return 1;
     prototype_api=api;prototype_mod=mod;
-    if(!prototype_prepare(api,mod)){api->log(mod,"HF049 TERMINAL platform initialization refused native_calls=0");return 0;}
+    if(!prototype_prepare(api,mod)){api->log(mod,"USS formation probe TERMINAL platform initialization refused native_calls=0");return 0;}
     if(!api->on_game_thread(mod,prototype_tick,NULL)){prototype_stop("CALLBACK_REGISTRATION");return 0;}
-    api->log(mod,"HF049 WAIT_REQUEST version=" USS_FORMATION_VERSION_TEXT " pid=%u started=%llu sdk=%u build=25480438 native_calls=0 automatic_pickups=0 input_bindings=0",
+    api->log(mod,"USS formation probe WAIT_REQUEST version=" USS_FORMATION_VERSION_TEXT " pid=%u started=%llu sdk=%u build=25480438 native_calls=0 automatic_pickups=0 input_bindings=0",
         prototype_ticket.pid,(unsigned long long)prototype_ticket.process_started,api->version);
     return 0;
 }

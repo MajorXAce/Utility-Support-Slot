@@ -1,6 +1,6 @@
 #define USS_DIAGNOSTIC_TEST_MAIN diagnostic_regression_checks
 #include "capture_diagnostic_harness.c"
-#define hellforge_mod_init hf034_fixture_init
+#define hellforge_mod_init capture_fixture_init
 #include "../ResearchSource/capture_probe.c"
 #undef hellforge_mod_init
 static HfTickCallback recorded_capture_tick;
@@ -10,13 +10,13 @@ static int capture_register_fixture(HfMod* mod,HfTickCallback callback,void* use
 static const char* capture_fixture_logs(HfMod* mod)
 {
     static char path[1024];DWORD count;assert(mod==MOD);
-    count=GetFullPathNameA("build/hf-uss-039/platform-fixture",1024,path,NULL);assert(count && count<1024);return path;
+    count=GetFullPathNameA("build/capture-platform/platform-fixture",1024,path,NULL);assert(count && count<1024);return path;
 }
 static void clean_capture_fixture(void)
 {
     const wchar_t* names[]={L"hf034-session.bin",L"hf034-session.tmp",L"hf034-request.bin",L"hf039-identity-request.bin",L"hf039-identity-result.bin",L"hf039-identity-result.tmp"};unsigned i;wchar_t path[1024];
-    assert(CreateDirectoryW(L"build/hf-uss-039/platform-fixture",NULL) || GetLastError()==ERROR_ALREADY_EXISTS);
-    for(i=0;i<6;++i){assert(swprintf(path,1024,L"build/hf-uss-039/platform-fixture/%ls",names[i])>0);DeleteFileW(path);}
+    assert(CreateDirectoryW(L"build/capture-platform/platform-fixture",NULL) || GetLastError()==ERROR_ALREADY_EXISTS);
+    for(i=0;i<6;++i){assert(swprintf(path,1024,L"build/capture-platform/platform-fixture/%ls",names[i])>0);DeleteFileW(path);}
 }
 int main(void)
 {
@@ -24,18 +24,18 @@ int main(void)
     setup();recorded_capture_tick=NULL;capture_registration_count=0;capture_registration_result=0;
     fake.on_game_thread=capture_register_fixture;fake.logs_folder=capture_fixture_logs;
     {uint32_t version=fake.version,size=fake.size;
-        fake.version=9;assert(hf034_fixture_init(&fake,MOD)==1 && !capture_registration_count);
+        fake.version=9;assert(capture_fixture_init(&fake,MOD)==1 && !capture_registration_count);
         fake.version=version;fake.size=(uint32_t)USS_REQUIRED_API_BYTES-1;
-        assert(hf034_fixture_init(&fake,MOD)==1 && !capture_registration_count);
+        assert(capture_fixture_init(&fake,MOD)==1 && !capture_registration_count);
         fake.size=size;
     }
-    assert(hf034_fixture_init(&fake,MOD)==0);
+    assert(capture_fixture_init(&fake,MOD)==0);
     if(HF_USS_CAPTURE_ENABLED) {
         assert(recorded_capture_tick && capture_registration_count==1 && !atomic_load(&capture_enabled));
         recorded_capture_tick(MOD,0,NULL);assert(!reads && logs==1);
         clean_capture_fixture();setup();capture_registration_result=1;
         fake.on_game_thread=capture_register_fixture;fake.logs_folder=capture_fixture_logs;
-        assert(hf034_fixture_init(&fake,MOD)==0 && atomic_load(&capture_enabled));
+        assert(capture_fixture_init(&fake,MOD)==0 && atomic_load(&capture_enabled));
         assert(capture_control.session.pid==GetCurrentProcessId() && capture_control.session.nonce);
         recorded_capture_tick(MOD,0,NULL);assert(!reads && !capture_control.terminal);
         {UssCaptureRequest result={0},received={0};wchar_t path[1024];HANDLE file;DWORD bytes=0;

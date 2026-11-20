@@ -1,5 +1,5 @@
 #define USS_HISTORY_TEST_MAIN history_regression_checks
-#define history hf048_history
+#define history replacement_history_fixture
 #include "pickup_history_harness.c"
 #undef history
 #include "../src/replacement_transaction.h"
@@ -134,7 +134,7 @@ static void replacement_fixture(unsigned utility,unsigned pickup,unsigned select
         rows=segment(0x70004900,24);memset(rows,4,8);put32(rows+8,105);
         rows=fixture(0x70000700,240);put32(rows+192+4,22);put32(rows+192+12,1);
         put32(fixture(0x70000300,48)+4,105);
-    }memset(&hf048_history,0,sizeof(hf048_history));preference.known=1;preference.switch_on_pickup=pickup;
+    }memset(&replacement_history_fixture,0,sizeof(replacement_history_fixture));preference.known=1;preference.switch_on_pickup=pickup;
     if(!utility)memset(fixture(0x70003900,24),9,8);
     /* Context owns the secondary identity too; bootstrap after adding it. */
     memset(&candidate_life,0,sizeof(candidate_life));recover_scope();
@@ -165,9 +165,9 @@ static void replacement_fixture(unsigned utility,unsigned pickup,unsigned select
     memset(&replacement_work,0,sizeof(replacement_work));
 }
 static int begin_replacement(void)
-{return uss_replacement_begin(&replacement_work,&candidate_life,7,&hf048_history,&replacement_intent,&replacement_origin,&replacement_publication,&replacement_services,replacement_now);}
+{return uss_replacement_begin(&replacement_work,&candidate_life,7,&replacement_history_fixture,&replacement_intent,&replacement_origin,&replacement_publication,&replacement_services,replacement_now);}
 static UssReplacementPhase tick_replacement(uint64_t tick)
-{return uss_replacement_tick(&replacement_work,&candidate_life,7,&hf048_history,&replacement_publication,&replacement_services,replacement_now,tick);}
+{return uss_replacement_tick(&replacement_work,&candidate_life,7,&replacement_history_fixture,&replacement_publication,&replacement_services,replacement_now,tick);}
 static void complete_replacement(void)
 {
     unsigned i;for(i=0;i<30 && replacement_work.phase==USS_REPLACE_ACTIVE;++i){replacement_now+=25;tick_replacement(replacement_work.has_tick?replacement_work.last_tick+1:1);}
@@ -248,7 +248,7 @@ int USS_REPLACEMENT_TEST_MAIN(void)
     replacement_fixture(1,0,1,HF_SESSION_HOST);replacement_intent.kept=replacement_intent.released;assert(!begin_replacement());
     replacement_fixture(1,0,1,HF_SESSION_HOST);replacement_publication.record.pair_generation++;assert(!begin_replacement());
     replacement_fixture(1,0,1,HF_SESSION_HOST);replacement_publication.disabled=1;assert(!begin_replacement() && replacement_publication.disabled);
-    replacement_fixture(1,0,1,HF_SESSION_HOST);assert(begin_replacement());hf048_history.last_serial++;
+    replacement_fixture(1,0,1,HF_SESSION_HOST);assert(begin_replacement());replacement_history_fixture.last_serial++;
     replacement_now+=25;assert(tick_replacement(1)==USS_REPLACE_CANCELLED && !replacement_switches);
     replacement_fixture(1,0,1,HF_SESSION_HOST);assert(begin_replacement());core_flags.input=1;
     replacement_now+=25;assert(tick_replacement(1)==USS_REPLACE_CANCELLED && !replacement_switches);

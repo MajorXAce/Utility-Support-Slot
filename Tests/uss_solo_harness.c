@@ -8,7 +8,7 @@ static int solo_formation_effect(void* user,UssFormationEffect effect,uintptr_t 
 {
     UssReplacementEffect mapped=effect==USS_EFFECT_SELECT?USS_REPLACEMENT_SELECT:
         effect==USS_EFFECT_ATTACH?USS_REPLACEMENT_ATTACH:USS_REPLACEMENT_SEND;
-    candidate_life=automatic_runtime.life;replacement_work=automatic_controller.replacement;hf048_history=automatic_runtime.history;
+    candidate_life=automatic_runtime.life;replacement_work=automatic_controller.replacement;replacement_history_fixture=automatic_runtime.history;
     /* The active route uses formation, not a retained-replacement work object.
      * Own engine must use the real pair member rather than an absent old intent. */
     if(effect==USS_EFFECT_ATTACH && value==104)replacement_work.intent.incoming=

@@ -6,7 +6,7 @@ static FARPROC fixture_export(HMODULE module,LPCSTR name);
 #define GetModuleHandleExW fixture_module
 #define GetProcAddress fixture_export
 #include "../src/uss_vpm_windows.h"
-static unsigned present=1,exports_present=1,api_ready=1,module_calls,export_calls,getter_calls,option_calls,binding_calls;
+static unsigned mom_export=1,mbm_export=1,present=1,exports_present=1,api_ready=1,module_calls,export_calls,getter_calls,option_calls,binding_calls;
 static int ready(void){return 1;}
 static int option(const char* id,const UssVpmOption* spec,const char** error)
 {(void)error;assert(!strcmp(id,USS_VPM_MODE_ID) && spec->choice_count==2);++option_calls;return 1;}
@@ -24,7 +24,7 @@ static BOOL fixture_module(DWORD flags,LPCWSTR name,HMODULE* module)
 static FARPROC fixture_export(HMODULE module,LPCSTR name)
 {
  union {FARPROC raw;const UssVpmOptionsApi* (*options)(uint32_t);const UssVpmBindingsApi* (*bindings)(uint32_t);} fn;
- assert(module==(HMODULE)(uintptr_t)0x12340000);++export_calls;if(!exports_present)return NULL;
+ assert(module==(HMODULE)(uintptr_t)0x12340000);++export_calls;if(!exports_present || (!mom_export && !strcmp(name,"vpm_mom_api")) || (!mbm_export && !strcmp(name,"vpm_mbm_api")))return NULL;
  if(!strcmp(name,"vpm_mom_api"))fn.options=options_api;else {assert(!strcmp(name,"vpm_mbm_api"));fn.bindings=bindings_api;}return fn.raw;
 }
 int main(void)
@@ -44,5 +44,9 @@ int main(void)
  present=0;memset(&adapter,0,sizeof(adapter));before=module_calls;assert(!uss_vpm_windows_discover(&adapter,0,2));assert(!uss_vpm_windows_discover(&adapter,999,2) && module_calls==before+1);present=1;
  exports_present=0;memset(&adapter,0,sizeof(adapter));assert(!uss_vpm_windows_discover(&adapter,0,2) && !strcmp(adapter.reason,"EXPORTS_UNAVAILABLE"));before=export_calls;assert(!uss_vpm_windows_discover(&adapter,2000,2) && export_calls==before);exports_present=1;
  api_ready=0;memset(&adapter,0,sizeof(adapter));assert(!uss_vpm_windows_discover(&adapter,0,2) && !strcmp(adapter.reason,"WAIT_API"));api_ready=1;assert(uss_vpm_windows_discover(&adapter,1000,2));
+ mbm_export=0;memset(&adapter,0,sizeof adapter);assert(!uss_vpm_windows_discover(&adapter,0,2) && adapter.options_present && !adapter.menus.provider);
+ mbm_export=1;assert(uss_vpm_windows_discover(&adapter,1000,2));
+ mom_export=0;memset(&adapter,0,sizeof adapter);assert(!uss_vpm_windows_discover(&adapter,0,2) && !adapter.options_present);mom_export=1;
+ puts("C_OPTIONS_ONLY_DISCOVERY_PASS negotiated options presence independent of binding export; late binding becomes usable");
  puts("VPM discovery: negotiated APIv1 exact/extended prefixes; direct registration, missing/truncated/incompatible contract refusal, retry/cache and absent-provider behavior PASS");return 0;
 }

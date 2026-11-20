@@ -36,7 +36,15 @@ static inline UssPlayerGesture uss_player_input_poll(UssPlayerInput* input,UssSe
         current->flags.suspended || current->flags.paused || current->flags.down || current->flags.input){
         if(input)uss_player_input_reset(input,settings);return result;
     }
-    result.known=1;dedicated_mode=settings->current.mode==USS_BIND_DEDICATED;
+    if(settings->mode_change_pending || settings->mode_release_required){
+        /* Revoke commands during an authority change without interrupting an
+         * entered native transaction. Fresh context above is still required. */
+        result.known=1;settings->release_required=1;input->armed=input->fired=0;
+        if(!settings->mode_change_pending && !raw->dedicated_down && !raw->support_pressed && raw->cycle_held!=UINT32_C(0x3f800000))settings->mode_release_required=0;
+        input->support_down=raw->support_pressed;input->cycle_down=raw->cycle_held==UINT32_C(0x3f800000);
+        input->dedicated_down=raw->dedicated_down;return result;
+    }
+    result.known=1;dedicated_mode=uss_settings_effective_mode(settings)==USS_BIND_DEDICATED;
     support_enabled=!dedicated_mode || (owner->pair_present && current->inventory.slots[2]==owner->utility.entity);
     cycle=raw->cycle_held==UINT32_C(0x3f800000);
     support=current->inventory.slots[2];actual=current->inventory.held;
@@ -122,7 +130,7 @@ typedef struct UssPlayerControl {
     UssPlayerPendingSwap pending;
     void* user;int (*sample)(void*,const UssCoreObservation*,UssPlayerInputSample*);
     UssPairServiceResult (*select_single)(void*,const UssCoreObservation*);
-    const char* reason;unsigned controller_reports;
+    const char* reason;unsigned controller_reports,dedicated_reports,dedicated_last_down;const char* dedicated_last_gate;
 } UssPlayerControl;
 /* Software identity anchor only; starting a queued draw still requires the
  * ordinary fresh inventory/lifecycle/effect checks below. */
@@ -150,7 +158,7 @@ static inline void uss_player_queue_swap(UssPlayerControl* player,const UssPairO
 static inline unsigned uss_player_control(void* user,UssCoreLifecycle* life,const UssCoreObservation* current,uint64_t now)
 {
     UssPlayerControl* player=(UssPlayerControl*)user;UssAutomaticController* automatic;
-    UssFormationRuntime* runtime;UssPlayerInputSample raw={0};UssPlayerGesture gesture;unsigned busy,status,queueable,previous_cycle,previous_transition;
+    UssFormationRuntime* runtime;UssPlayerInputSample raw={0};UssPlayerGesture gesture;unsigned busy,status,queueable,previous_cycle,previous_transition,previous_dedicated,previous_release;
     UssPairMember target;
     if(!player || !player->automatic || !player->settings || !player->sample)return USS_CONTROL_STOP;
     automatic=player->automatic;runtime=automatic->formation;if(!runtime || life!=&runtime->life)return USS_CONTROL_STOP;
@@ -161,9 +169,23 @@ static inline unsigned uss_player_control(void* user,UssCoreLifecycle* life,cons
         now>=runtime->work.deadline_ms || (runtime->work.phase==USS_PAIR_COMPLETE && current->inventory.active_selector!=3)))
         memset(&player->pending,0,sizeof(player->pending));
     if(!player->sample(player->user,current,&raw))raw.known=0;
+    previous_dedicated=player->input.dedicated_down;previous_release=player->settings->release_required;
     previous_cycle=player->input.cycle_down;previous_transition=player->input.transitioned;
     gesture=uss_player_input_poll(&player->input,player->settings,current,&life->owner,&raw,now,
         queueable?USS_INPUT_WORK_QUEUE_DRAW:busy);
+    if(uss_settings_effective_mode(player->settings)==USS_BIND_DEDICATED){
+        uint32_t selected=current->inventory.active_selector,expected=selected>=1 && selected<=3?current->inventory.slots[selected-1]:0;
+        const char* gate=!gesture.known?"CONTEXT_OR_UI_UNKNOWN":previous_release?"RELEASE_BASELINE":gesture.queue_requested?"QUEUE_MANAGED_DRAW":
+          busy?"BUSY":gesture.hit?(current->inventory.held==life->owner.utility.entity?"EQUIP_ALREADY_UTILITY":"HIT"):
+          raw.dedicated_down && !previous_dedicated && current->inventory.held!=expected?"HELD_SELECTED_MISMATCH":"NO_EDGE";
+        if(player->dedicated_reports<64 && (raw.dedicated_down!=player->dedicated_last_down || (raw.dedicated_down && gate!=player->dedicated_last_gate)) && automatic->api->log){
+          ++player->dedicated_reports;automatic->api->log(automatic->mod,
+            "USS dedicated stage tick_ms=%llu gate=%s raw=%u previous=%u release_before=%u hit=%u queued=%u selected=%u held=%u expected=%u utility=%u owner_epoch=%llu context=%llu guard=%llu revision=%llu",
+            (unsigned long long)now,gate,raw.dedicated_down,previous_dedicated,previous_release,gesture.hit,gesture.queue_requested,selected,current->inventory.held,expected,life->owner.utility.entity,
+            (unsigned long long)life->owner.epoch,(unsigned long long)life->owner.context_generation,(unsigned long long)life->owner.guard_generation,(unsigned long long)player->settings->revision);
+        }
+        player->dedicated_last_down=raw.dedicated_down;player->dedicated_last_gate=gate;
+    }
     /* Capture semantic recognition milestones from this already-owned snapshot.
      * No input mutation or extra game read; onset/transition/hit are separate. */
     if(gesture.known && player->controller_reports<64 && automatic->api->log &&
@@ -201,7 +223,7 @@ static inline unsigned uss_player_control(void* user,UssCoreLifecycle* life,cons
         }
     }
     if(!gesture.hit){
-        if(player->settings->current.mode==USS_BIND_DEDICATED && life->owner.pair_present && current->pair_matched &&
+        if(uss_settings_effective_mode(player->settings)==USS_BIND_DEDICATED && life->owner.pair_present && current->pair_matched &&
             current->inventory.slots[2]==life->owner.utility.entity &&
             (current->inventory.active_selector==1 || current->inventory.active_selector==2) &&
             current->inventory.held==current->inventory.slots[current->inventory.active_selector-1]){
@@ -232,7 +254,7 @@ static inline unsigned uss_player_control(void* user,UssCoreLifecycle* life,cons
     if(!gesture.dedicated && current->inventory.slots[2]==target.entity)target=life->owner.ordinary;
     automatic->origin_valid=0;
     if(!uss_formation_start(runtime,USS_PAIR_DRAW,&target))return automatic_stop(automatic,"PLAYER_DRAW_START_REFUSED");
-    runtime->controller_draw=player->settings->current.mode==USS_BIND_DEFAULT && !gesture.dedicated &&
+    runtime->controller_draw=uss_settings_effective_mode(player->settings)==USS_BIND_DEFAULT && !gesture.dedicated &&
         raw.cycle_held==UINT32_C(0x3f800000) && player->input.transitioned;
     player->reason="PLAYER_DRAW_STARTED";return USS_CONTROL_WORK;
 }

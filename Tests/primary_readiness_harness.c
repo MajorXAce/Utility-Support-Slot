@@ -2,7 +2,7 @@
 #error Primary readiness checks require active assertions
 #endif
 #ifndef USS_FIXTURE_SEGMENTS
-#define USS_FIXTURE_SEGMENTS 48
+#define USS_FIXTURE_SEGMENTS 64
 #endif
 #define USS_ACTION_TEST_MAIN action_regression_checks
 #include "action_state_harness.c"
@@ -99,7 +99,7 @@ int USS_PRIMARY_TEST_MAIN(void)
     result=observe_primary();assert(result.valid && result.ready && result.fields.action.index==1);
     primary_fixture();last_reader.calls=10;last_reader.bytes=100;
     result=observe_primary();assert(result.valid && result.ready && last_reader.calls==total+10);
-    assert(last_reader.bytes==4891);
+    assert(last_reader.bytes==5267);
     /* can_switch can stay true while publication readiness is false. */
     primary_fixture();put32(fixture(ACTION_MANAGER+0x53DCD0,32)+4,2);
     result=observe_primary();not_ready(result);assert(result.fields.action.switch_ready);

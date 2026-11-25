@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "implementation": "HellForge C",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "files": {
     ".gitattributes": {
       "source": "PublicRelease/.gitattributes",
@@ -25,7 +25,7 @@
     },
     "README.md": {
       "source": "PublicRelease/README.md",
-      "sha256": "26b97bc4085f6e09124dd95f0f527d5a29a43841ad10d341e1b9a98b44a37583"
+      "sha256": "5fff07b92d7945128355bb0a1820ecf1b00c02adf890411f36716f86c637ab9d"
     },
     "ResearchSource/capture_probe.c": {
       "source": "ResearchSource/capture_probe.c",
@@ -41,7 +41,7 @@
     },
     "ResearchSource/inventory_reader.h": {
       "source": "ResearchSource/inventory_reader.h",
-      "sha256": "d927d631664aaebc2aff789d5bf078434d7f984c3e2ab3cbcf100e76a7dbf5c4"
+      "sha256": "3aaa4815fee07946726d9d38730217f9fb503701ee510a96c787da1293fdd906"
     },
     "ResearchSource/replacement_probe.c": {
       "source": "ResearchSource/replacement_probe.c",
@@ -65,15 +65,15 @@
     },
     "Tests/core_candidates_harness.c": {
       "source": "Tests/core_candidates_harness.c",
-      "sha256": "4e08223387338f7f7c2de2c3af2681749760564151a79a4224c729f046c013b1"
+      "sha256": "b812f39f8af939c9bdcc2ce9a8c4525f1f24ce66e9b5e168167d9a045dea7419"
     },
     "Tests/core_lifecycle_harness.c": {
       "source": "Tests/core_lifecycle_harness.c",
-      "sha256": "1fbf24bd43102d7a4d441a2eb25d663519d27bd1496a04be11729a6c7c7a29df"
+      "sha256": "c36f43e9de8e70f6e101af40d8477862d1a76421634b2e2d1165c9a4d11f1c00"
     },
     "Tests/core_observation_harness.c": {
       "source": "Tests/core_observation_harness.c",
-      "sha256": "f43e5e589171a824d23522f9c78567fec0d3dc95159d123efea732bfa89ab948"
+      "sha256": "d2b69759123cb477f73c1ced35b5a60dc17b8a4e336dbf86b4f29297121a5f18"
     },
     "Tests/custom_support_harness.c": {
       "source": "Tests/custom_support_harness.c",
@@ -101,7 +101,7 @@
     },
     "Tests/inventory_harness.c": {
       "source": "Tests/inventory_harness.c",
-      "sha256": "3b57d48628a4cc51b8fdfcbc08b89efa95be6539fc67f6f7aa64abf058fed31b"
+      "sha256": "85e157bdf2a6c6494f593161061d615bc2403be11ce1502c1b08af3021ef6e68"
     },
     "Tests/menu_first_use_harness.c": {
       "source": "Tests/menu_first_use_harness.c",
@@ -129,11 +129,11 @@
     },
     "Tests/pickup_history_harness.c": {
       "source": "Tests/pickup_history_harness.c",
-      "sha256": "c20dfe87d26fc1fc7f0f94c787993f085851759bc8a7302f124292d7d3ec0c09"
+      "sha256": "b30d7bc826a61d629b7a0a5e775d5431be8a8395e31eb129d3407dabfe2160f4"
     },
     "Tests/primary_readiness_harness.c": {
       "source": "Tests/primary_readiness_harness.c",
-      "sha256": "0ae6ee932d9b9eba66953aa9b1b99f8eaf33f93d22dfb8c2f760456de2a57090"
+      "sha256": "f51ead73f8880badb7f873ba94282939f702a20d7ffe97a7a54493daf710a9b9"
     },
     "Tests/probe_harness.c": {
       "source": "Tests/probe_harness.c",
@@ -141,7 +141,7 @@
     },
     "Tests/publication_capture_harness.c": {
       "source": "Tests/publication_capture_harness.c",
-      "sha256": "fbc0d1d4eccb4596d8295cb16a06d4d3ba69959e9e1e8fa75a1b24d4ffa4d16d"
+      "sha256": "b0218167c97d5ec24fb19e3fcc410cae24e8954a1292dbeb0a767021dfbee24a"
     },
     "Tests/publication_state_harness.c": {
       "source": "Tests/publication_state_harness.c",
@@ -161,7 +161,7 @@
     },
     "Tests/replacement_observation_harness.c": {
       "source": "Tests/replacement_observation_harness.c",
-      "sha256": "f81d35504a76b23da77e635f06157d7e0bf036487657400e16953abcc85355c8"
+      "sha256": "defc2debfa79c9a14fd96b855ac89530cf3be6a25b7a6859bfb4d694158d623a"
     },
     "Tests/replacement_probe_harness.c": {
       "source": "Tests/replacement_probe_harness.c",
@@ -197,11 +197,11 @@
     },
     "Tests/uss_automatic_replacement_harness.c": {
       "source": "Tests/uss_automatic_replacement_harness.c",
-      "sha256": "8714623a7dc83af85d94c934be739f38cb3fb59496a84b0642b5233874542adc"
+      "sha256": "eef082f804d719031ae8927b9273b2fc5520128ccc3447da4e30f10b106207b5"
     },
     "Tests/uss_automatic_retained_harness.c": {
       "source": "Tests/uss_automatic_retained_harness.c",
-      "sha256": "45f95eb083f647bf2d44da1888a77828ca3c6a540898b499abbdaaeb5c48b534"
+      "sha256": "3737df3307d9d0c17f0ef0593d2999dac51523ac54f8cf8febf55161c10c39a1"
     },
     "Tests/uss_binding_capture_harness.c": {
       "source": "Tests/uss_binding_capture_harness.c",
@@ -237,15 +237,15 @@
     },
     "Tests/uss_hud_drop_harness.c": {
       "source": "Tests/uss_hud_drop_harness.c",
-      "sha256": "1f5ca44ff663824d19ef161b3f358b0d7f6b70379560b96575e76cf19600c3f2"
+      "sha256": "be59642b0eb6e89b836e23ed6a5e998c67286a166a0de058186b0daf789f3c1a"
     },
     "Tests/uss_hud_presentation_harness.c": {
       "source": "Tests/uss_hud_presentation_harness.c",
-      "sha256": "22297a4e7843282b110a6afe599501f7694bd309113ec2408bdf7323ba37ed67"
+      "sha256": "2523d52c7130048ee0d3cf480129fae3f5ed55b54debaee14b3bef9834be0579"
     },
     "Tests/uss_hud_runtime_harness.c": {
       "source": "Tests/uss_hud_runtime_harness.c",
-      "sha256": "1b7153893ccdbb89da4d263612640cfa2c9438be336cb03fd0e7eb6ee0b1e08d"
+      "sha256": "fa16a7afb75ab4aabf955c67646b5a2e135ba7c95a9c0037b2189fe7151d2dc6"
     },
     "Tests/uss_hud_windows_harness.c": {
       "source": "Tests/uss_hud_windows_harness.c",
@@ -381,11 +381,11 @@
     },
     "Tests/uss_recovery_harness.c": {
       "source": "Tests/uss_recovery_harness.c",
-      "sha256": "08a06ed3bdcf2378001ced39471c32321fcc23fe531aa05cdf018b4f034854de"
+      "sha256": "ba3c34a853af0def92f66a8ebf961a91e1f8422fa645595943ea213b9f26667a"
     },
     "Tests/uss_recovery_interruption_harness.c": {
       "source": "Tests/uss_recovery_interruption_harness.c",
-      "sha256": "85e48601677a20568ca0729677e29a874fbabd95d2e174191def3eeb82d8c7a7"
+      "sha256": "fc03b969b57501d6ee0cdc3bd9e87fefed874c831848897361f0be3843f035d1"
     },
     "Tests/uss_refill_amount_harness.c": {
       "source": "Tests/uss_refill_amount_harness.c",
@@ -421,7 +421,7 @@
     },
     "Tests/uss_session_harness.c": {
       "source": "Tests/uss_session_harness.c",
-      "sha256": "e04daa2087b109c8a1617bde075ec244bb3f1b5c03dbe1a136aac9ca034408ac"
+      "sha256": "ba4c9ced4217033dd36d5d4fd2211915e04eb1315b522bf6e72bea86b080c813"
     },
     "Tests/uss_settings_harness.c": {
       "source": "Tests/uss_settings_harness.c",
@@ -465,7 +465,7 @@
     },
     "Tools/check_current.py": {
       "source": "PublicRelease/Tools/check_current.py",
-      "sha256": "752ff600402bee152875d4d79819db2f7d1fad8757e107ed09ecb27d24a500b6"
+      "sha256": "9e73be4ba457569cccbea201ae2dac1d68c81b69d747ceaf975b4c949ade70f0"
     },
     "Tools/sdk_baseline.json": {
       "source": "PublicRelease/Tools/sdk_baseline.json",
@@ -477,11 +477,11 @@
     },
     "VERSION": {
       "source": "PublicRelease/VERSION",
-      "sha256": "780363b8ef02ff7e83eb72709f6396b09dec21a26403bb44f58ea8d6757fe33d"
+      "sha256": "98dc75c852d20adf59424bfd20755dd0082523d039f364f73963f8fa6d01e1a4"
     },
     "hellforge-mod.json": {
       "source": "PublicRelease/hellforge-mod.json",
-      "sha256": "2a346fa78026bc0ca4e17c85f85826ee88ca221c05e6430690b8520d8ee9c3b5"
+      "sha256": "0df0fb0480861518c69fce8c42c52643fe371ef5b051e85f0935431e57370620"
     },
     "icon.png": {
       "source": "PublicRelease/icon.png",
@@ -489,7 +489,7 @@
     },
     "release_notes.md": {
       "source": "PublicRelease/release_notes.md",
-      "sha256": "0c000118186c1d0ec54b78cf2caaf1cdc4e4b1dc719f3e764704f1d83f733497"
+      "sha256": "cbc6b5743e0f9b6007e3ea36aa7ff36378d21e4e085ce0de3ea4cb06fcae1ad4"
     },
     "src/action_state.h": {
       "source": "src/action_state.h",
@@ -521,7 +521,7 @@
     },
     "src/capture_read.h": {
       "source": "src/capture_read.h",
-      "sha256": "9a90917f11eb725500534396e61fe057e5b22893a28c22da29ad369fc591b7fa"
+      "sha256": "7e35505f9926d39072440709f34b18f03244789c583981bf45fa696a1435a4c7"
     },
     "src/core_lifecycle.h": {
       "source": "src/core_lifecycle.h",
@@ -593,7 +593,7 @@
     },
     "src/publication_capture.h": {
       "source": "src/publication_capture.h",
-      "sha256": "a89e676178118a46c5377e5fd2c1c1d16d8d726a07e9fedb9c2eac6f5c305ab9"
+      "sha256": "d1806eceb29ec2b16b88a34f5de7d0941e37c555a91e94dc48ab1ab35cecebd8"
     },
     "src/publication_state.h": {
       "source": "src/publication_state.h",
@@ -617,7 +617,7 @@
     },
     "src/replacement_observation.h": {
       "source": "src/replacement_observation.h",
-      "sha256": "d932a47f2198b2c1254e538cfd56084793727c34755a07af678eb864fa43226d"
+      "sha256": "8b07988f799bd3e56132f174a652c44f5a1cd0e12d210c4aef7a1a01c5cdcef0"
     },
     "src/replacement_transaction.h": {
       "source": "src/replacement_transaction.h",
@@ -673,11 +673,11 @@
     },
     "src/uss_gameplay_application.h": {
       "source": "src/uss_gameplay_application.h",
-      "sha256": "89748fe154a95d3f1b7fe5de296e2916ff615cce5212e620273cf0e45d544469"
+      "sha256": "ebc1cdc12842ffbad644a5e0fdd19af5f3103c5b96b3fe20afba09be84ea5b53"
     },
     "src/uss_gameplay_loop.h": {
       "source": "src/uss_gameplay_loop.h",
-      "sha256": "6753df235c39fd62d43f98a522ca89f52b634886ea221d757b2da00beb2443c4"
+      "sha256": "0efb6d97f5ce08692e5b63740cb2558ace54ed73bb1fa304cbcccb560d59576a"
     },
     "src/uss_gameplay_windows.h": {
       "source": "src/uss_gameplay_windows.h",
@@ -693,11 +693,11 @@
     },
     "src/uss_hud_metadata.h": {
       "source": "src/uss_hud_metadata.h",
-      "sha256": "38638ee6f5cce9ca6b3cd89b4104efdb706b2a97e4181ec713904452ae0e5a25"
+      "sha256": "017c70a4e4be7fc3deb23a2a117af88accd53f76ee6eac2c7f22b864cbc506e2"
     },
     "src/uss_hud_pins.h": {
       "source": "src/uss_hud_pins.h",
-      "sha256": "8bb9261492fa8acfcec04912803cde0f04e8afde8fc8dc4cbe9215fe3bb0d448"
+      "sha256": "501da52f033e5a008ce572f49e6931144473f1d95fd88c78ee9d084ded91610e"
     },
     "src/uss_hud_presentation.h": {
       "source": "src/uss_hud_presentation.h",
@@ -857,7 +857,7 @@
     },
     "src/uss_recovery.h": {
       "source": "src/uss_recovery.h",
-      "sha256": "e4d13adcb07592235b977225165edac8d9ba75495a85cb174459ce2708efe20a"
+      "sha256": "3aa306be35ce23aabfc50e515aa6b571059e2f4aa0b9c79c573e8c3527ba0017"
     },
     "src/uss_recovery_native.h": {
       "source": "src/uss_recovery_native.h",
@@ -865,11 +865,11 @@
     },
     "src/uss_recovery_reader.h": {
       "source": "src/uss_recovery_reader.h",
-      "sha256": "634803467e59af976efdc6f2707322ab8a4d86f0adc139549fba34ac142c9cb5"
+      "sha256": "1a420a16af87d2f83c71c603e152558ff0b45264f8efb31a979ad6658df8648e"
     },
     "src/uss_recovery_runtime.h": {
       "source": "src/uss_recovery_runtime.h",
-      "sha256": "ac16f39579f7d42e720bfb83992ab48ae4ae7933b6ca9bec244fb0f4eed77a40"
+      "sha256": "734813623e56fec352d8aecdec547429d982f05d9d8afecf8f95daaa7edc833f"
     },
     "src/uss_refill_amount.h": {
       "source": "src/uss_refill_amount.h",
@@ -990,6 +990,22 @@
     "src/uss_native_lua_windows.h": {
       "source": "src/uss_native_lua_windows.h",
       "sha256": "92a6e2f7b40a9d9dc38df71a6a2c651fa535d0a99a0c14e68a2acc2fdc0fb20a"
+    },
+    "src/entity_layout.h": {
+      "source": "src/entity_layout.h",
+      "sha256": "e4d2569365a6964256a614b8fc97f257042f33c515decb71cc054c56b2bce496"
+    },
+    "src/uss_member_identity_source.h": {
+      "source": "src/uss_member_identity_source.h",
+      "sha256": "f9071751ffaf536b7685ba5e00b93113e701ef6fc691b2e5ec293c6cddcefccb"
+    },
+    "Tests/hellforge_layout_harness.c": {
+      "source": "Tests/hellforge_layout_harness.c",
+      "sha256": "d6d3d480fc7c5f380c5997cda02b063ea1f73743ccdf4b5e28a3726f979b08aa"
+    },
+    "Tests/uss_identity_retention_harness.c": {
+      "source": "Tests/uss_identity_retention_harness.c",
+      "sha256": "5547c71b1d89303d8e2c9ef8922399646d2acc3eda1cb5d87b854a9e28451de3"
     }
   },
   "private_evidence_exported": false,

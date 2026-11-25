@@ -58,7 +58,8 @@ static int application_formation_effect(void* user,UssFormationEffect effect,uin
 static const char* application_policy_reason(void* user)
 {UssGameplayApplication* app=user;return app->input.reason;}
 /* A blocked shortcut is not a failed inventory transaction. Do not interrupt a
- * settled pair for a menu/overlay, but never let this shortcut mask active work. */
+ * settled pair or qualified pre-native recovery for a menu/overlay. Entered
+ * effects and competing operations never use this deferral. */
 static int application_policy_defer_idle(void* user)
 {
     UssGameplayApplication* app=user;const char* why=app->input.reason;
@@ -68,8 +69,9 @@ static int application_policy_defer_idle(void* user)
     if(app->loop.handling_paused || app->loop.refill.busy || app->player.pending.present || app->formation.busy || app->formation.publication.busy ||
         (app->formation.work.phase!=USS_PAIR_IDLE && app->formation.work.phase!=USS_PAIR_COMPLETE) ||
         (app->automatic.replacement.phase!=USS_REPLACE_IDLE && app->automatic.replacement.phase!=USS_REPLACE_COMPLETE) ||
-        app->recovery.waiting || (app->recovery.work.phase!=USS_RECOVERY_IDLE && app->recovery.work.phase!=USS_RECOVERY_COMPLETE) ||
         (app->formation.life.phase!=USS_LIFE_EMPTY && app->formation.life.phase!=USS_LIFE_FORMED))return 0;
+    if(app->recovery.waiting || (app->recovery.work.phase!=USS_RECOVERY_IDLE && app->recovery.work.phase!=USS_RECOVERY_COMPLETE))
+        return uss_recovery_defer_pre_native(&app->recovery);
     return 1;
 }
 static int application_policy(void* user,UssCoreFlags* flags)
@@ -145,6 +147,17 @@ static int application_recovery_input(void* user,const UssRecoverySnapshot* snap
     current.valid=current.mission=1;current.flags=app->loop.policy;current.inventory=snapshot->inventory;current.primary=snapshot->primary;
     if(!uss_player_sdk_sample(&app->input,&current,&raw))return 0;
     gesture=uss_player_input_poll(&app->player.input,&app->settings,&current,&app->formation.life.owner,&raw,application_clock(app),1);
+    if(app->recovery.work.policy_deferred){
+        unsigned selected=snapshot->inventory.active_selector;
+        /* Strict busy polling preserves gesture interruption and demands a
+         * release. Only a fresh neutral sample may satisfy it; an ignored held
+         * gesture never establishes the baseline for a resumed native entry. */
+        (void)uss_settings_input_ready(&app->settings,raw.foreground,!raw.ui_clear,0,0,
+            raw.support_pressed || raw.dedicated_down || raw.cycle_held==UINT32_C(0x3f800000));
+        if(app->settings.release_required || app->settings.mode_change_pending || app->settings.mode_release_required ||
+            raw.support_pressed || raw.dedicated_down || raw.cycle_held==UINT32_C(0x3f800000) ||
+            (selected!=1 && selected!=2) || snapshot->inventory.held!=snapshot->inventory.slots[selected-1])return 0;
+    }
     return gesture.known && !gesture.interrupted;
 }
 static unsigned application_recovery(void* user,const UssCoreObservation* current,uint64_t now)
@@ -152,6 +165,13 @@ static unsigned application_recovery(void* user,const UssCoreObservation* curren
     UssGameplayApplication* app=user;
     if(!app->initialized)return USS_CONTROL_STOP;
     app->formation.policy=app->loop.policy;
+    /* A pending player command or refill owns separate work. Do not let a
+     * suspended pre-entry recovery become an alternate path around it. */
+    if((app->recovery.waiting || app->recovery.work.phase==USS_RECOVERY_ATTACH) &&
+        (app->player.pending.present || app->loop.refill.busy)){
+        app->recovery.reason="RECOVERY_COMPETING_APPLICATION_WORK";
+        (void)recovery_cancel(&app->recovery.work,app->recovery.reason);return USS_CONTROL_STOP;
+    }
     {UssRecoveryPhase before=app->recovery.work.phase;unsigned result=uss_recovery_control(&app->recovery,current,now);
         /* Match Lua's switch_entity acknowledgment: the survivor is freshly
          * verified and the pair cleared, before later publication ticks allow

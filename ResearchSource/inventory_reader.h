@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdatomic.h>
+#include "../src/entity_layout.h"
 
 typedef struct Reader {
     const HfApi* api;
@@ -40,6 +41,7 @@ typedef struct Reader {
 typedef struct Inventory {
     uintptr_t roots[5];
     uintptr_t row_address;
+    uintptr_t owner_records; /* Current EntityManager record array, qualified per observation. */
     unsigned char avatar_header[24], row[48];
     uint32_t local_unit, avatar, slots[4], active_selector, held;
     unsigned char identities[5][24];
@@ -82,6 +84,32 @@ static int get(Reader* r, uintptr_t a, void* out, size_t n)
 static int get_ptr(Reader* r, uintptr_t a, uintptr_t* out)
 {
     return get(r,a,out,8) && address_ok(*out,72);
+}
+typedef struct InventoryLayout {
+    Reader* memory;uintptr_t base,entity_manager;size_t image_size;
+    int32_t records;unsigned site,recheck;unsigned char code[8][20];
+} InventoryLayout;
+static int inventory_layout_read(void* user,uint64_t address,void* out,unsigned size)
+{
+    InventoryLayout* layout=(InventoryLayout*)user;unsigned site=layout->site++;
+    if(site>=8 || !get(layout->memory,(uintptr_t)address,out,size))return 0;
+    if(layout->recheck)return !memcmp(layout->code[site],out,size);
+    memcpy(layout->code[site],out,size);return 1;
+}
+static int inventory_layout_begin(InventoryLayout* layout,Reader* memory,uintptr_t base,size_t size)
+{
+    memset(layout,0,sizeof(*layout));layout->memory=memory;layout->base=base;layout->image_size=size;
+    memory->stage="AVATAR_RECORD_LAYOUT";
+    return size>=0x346BFA0 && eel_records(inventory_layout_read,layout,base,size,&layout->records) &&
+        get_ptr(memory,base+0x346BF98,&layout->entity_manager);
+}
+static int inventory_layout_final(InventoryLayout* layout)
+{
+    uintptr_t manager=0;int32_t records;
+    layout->site=0;layout->recheck=1;layout->memory->stage="AVATAR_RECORD_LAYOUT_FINAL";
+    return eel_records(inventory_layout_read,layout,layout->base,layout->image_size,&records) &&
+        records==layout->records && get_ptr(layout->memory,layout->base+0x346BF98,&manager) &&
+        manager==layout->entity_manager;
 }
 static int lookup(Reader* r, uintptr_t table, uint32_t key, uint32_t* index)
 {
@@ -279,25 +307,35 @@ static int weapon(Reader* r, uintptr_t global, uintptr_t manager, uint32_t id, u
     return get_ptr(r,global,&now) && now==manager && get(r,manager,again,72) &&
            !memcmp(h,again,72) && get(r,unit,descriptor,24) && !memcmp(out,descriptor,24);
 }
-static int graph(Reader* r, const uintptr_t globals[5], Inventory* out)
+static int graph(Reader* r, const uintptr_t globals[5], Inventory* out,uintptr_t entity_manager,int32_t records)
 {
     unsigned k;
     uint32_t oi,ii,hi;
-    uintptr_t owned,rows,held_rows;
+    uintptr_t owned,rows,held_rows;uint64_t descriptor_address,record_base;
     unsigned char arrays[24],descriptor[24];
     memset(out,0,sizeof(*out));
     r->predicate_valid=0;
     r->expected_entity=0; r->observed_entity=0; r->observed_kind=0;
     r->slot=-1; r->stage="MANAGER_ROOTS";
     for(k=0;k<5;++k) if(!get_ptr(r,globals[k],&out->roots[k])) return 0;
+    /* Native construction: EntityManager+40 -> manager bundle+1400.
+     * Check the actual roots; nearby offsets alone never establish an alias. */
+    r->stage="OWNER_ENTITY_MANAGER";
+    if(!address_ok(entity_manager,0x1440) || out->roots[0]!=entity_manager+0x1440){
+        r->detail="OWNER_ENTITY_MANAGER_MISMATCH";return 0;}
     r->stage="LOCAL_OWNER_AVATAR";
     if(!get(r,out->roots[1]+0x3A8,&out->local_unit,4) || !valid_id(out->local_unit) ||
        !lookup(r,out->roots[0]+0xF21A88,out->local_unit,&oi) || oi>1048576 ||
-       !get(r,out->roots[0]+0xF31AD8+(uintptr_t)oi*24,out->avatar_header,24)) return 0;
+       !eel_record_address(entity_manager,records,oi,&descriptor_address) ||
+       !eel_record_address(entity_manager,records,0,&record_base) ||
+       !get(r,(uintptr_t)descriptor_address,out->avatar_header,24)) return 0;
+    out->owner_records=(uintptr_t)record_base;
     out->avatar=u32(out->avatar_header+8);
     r->stage="INVENTORY_LOOKUP_ARRAYS";
-    if(!valid_id(out->avatar) || !lookup(r,out->roots[2]+40,out->avatar,&ii) || ii>4096 ||
-       !get(r,out->roots[2]+64,arrays,24)) return 0;
+    if(!valid_id(out->avatar)){r->detail="AVATAR_ID_INVALID";return 0;}
+    if(!lookup(r,out->roots[2]+40,out->avatar,&ii)){r->detail="AVATAR_INVENTORY_LOOKUP";return 0;}
+    if(ii>4096){r->detail="AVATAR_INVENTORY_INDEX";return 0;}
+    if(!get(r,out->roots[2]+64,arrays,24)){r->detail="AVATAR_INVENTORY_ARRAY_READ";return 0;}
     rows=ptr_value(arrays+16);
     r->stage="INVENTORY_OWNER_ROW";
     if(!address_ok(ptr_value(arrays),(size_t)(ii+1)*8) || !address_ok(rows,(size_t)(ii+1)*48) ||
@@ -370,22 +408,24 @@ static int inventory_sample(Reader* r, Inventory* output)
 {
     uintptr_t base,globals[5];
     size_t size=0,after_size=0;
-    Inventory first,second;
+    Inventory first,second;InventoryLayout layout;
     base=r->api->module_base("game.dll",&size);
     r->slot=-1; r->stage="MODULE_PINS";
     if(!base) { pin_refusal(r,-1,0,"MODULE_BASE"); r->failure="MODULE_PINS"; return 0; }
     /* The broad label stays MODULE_PINS for compatibility; the precise cause is in the pin_* fields set by resolve(). */
     if(!resolve(r,base,size,globals)) { r->failure="MODULE_PINS"; return 0; }
+    if(!inventory_layout_begin(&layout,r,base,size)){if(!r->failure)r->failure="AVATAR_RECORD_LAYOUT";return 0;}
     r->pass=1;
-    if(!graph(r,globals,&first)) {
+    if(!graph(r,globals,&first,layout.entity_manager,layout.records)) {
         if(!r->failure) r->failure="GRAPH_IDENTITY";
         return 0;
     }
     r->pass=2;
-    if(!graph(r,globals,&second)) {
+    if(!graph(r,globals,&second,layout.entity_manager,layout.records)) {
         if(!r->failure) r->failure="GRAPH_IDENTITY";
         return 0;
     }
+    if(!inventory_layout_final(&layout)){if(!r->failure)r->failure="AVATAR_RECORD_LAYOUT_CHANGED";return 0;}
     /* Always collect final module metadata, even when another check will refuse. */
     {
         uintptr_t after_base=r->api->module_base("game.dll",&after_size);

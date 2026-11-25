@@ -37,14 +37,15 @@ static void observation_fixture(unsigned utility,unsigned pickup,unsigned select
     assert(begin_replacement());
     /* Map the incoming unit and keep native descriptor equality exact. */
     {const uint32_t handles[]={22,101,103,102,104,105},positions[]={3,2,0,1,4,5},wires[]={50,51,52,53,54,55};
-        unsigned i;uintptr_t descriptor[]={0x20000000+0xF31AD8,0x70000900,0x70002900,0x70001900,0x70003900,0x70004900};
+        unsigned i;uintptr_t descriptor[]={fixture_avatar_record,0x70000900,0x70002900,0x70001900,0x70003900,0x70004900};
         hash_rows(MAPPING+0xF1AEB0,0xA3010000,8,handles,positions,6);
         /* Existing fixture rows win lookup: update rather than append shadows. */
         {unsigned char* h=fixture(MAPPING+0xF1AEB0,20);unsigned char* data=fixture(0xA3010000,64);
             (void)h;memset(data,0xff,64);for(i=0;i<6;++i){unsigned k=handles[i]&7;while(u32(data+k*8)!=UINT32_MAX)k=(k+1)&7;put32(data+k*8,handles[i]);put32(data+k*8+4,positions[i]);}}
         {unsigned char* data=fixture(0xA3020000,64);memset(data,0xff,64);for(i=0;i<6;++i){unsigned k=wires[i]&7;while(u32(data+k*8)!=UINT32_MAX)k=(k+1)&7;put32(data+k*8,wires[i]);put32(data+k*8+4,positions[i]);}}
+        {unsigned k=11&7;unsigned char* data=fixture(0xA3020000,64);while(u32(data+k*8)!=UINT32_MAX)k=(k+1)&7;put32(data+k*8,11);put32(data+k*8+4,3);}
         for(i=0;i<6;++i){unsigned char* d=fixture(descriptor[i],24);put32(d+16,wires[i]);put32(d+20,1);
-            memcpy(control_segment(MAPPING+0xF32F18+(uintptr_t)positions[i]*24,24),d,24);}
+            memcpy(control_segment(MAPPING+USS_FIXTURE_RECORDS+(uintptr_t)positions[i]*24,24),d,24);}
     }
     {const uint32_t handles[]={101,102,103,104},indexes[]={0,1,2,3};unsigned i;
         unsigned char* header=fixture(0x92000018,20);unsigned char* data=fixture(0x92000100,64);
@@ -87,7 +88,7 @@ int USS_REPLACEMENT_OBSERVATION_TEST_MAIN(void)
     observation_fixture(1,0,1,HF_SESSION_HOST);observation_mutate=2;assert(!read_observation(0));
     observation_fixture(1,0,1,HF_SESSION_HOST);core_flags.input=1;assert(!read_observation(0));
     observation_fixture(1,0,1,HF_SESSION_HOST);put32(fixture(BASE+0x348456C,4),123);assert(!read_observation(0));
-    observation_fixture(1,0,1,HF_SESSION_HOST);put32(fixture(MAPPING+0xF32F18+4*24,24)+16,32767);assert(!read_observation(0));
+    observation_fixture(1,0,1,HF_SESSION_HOST);put32(fixture(MAPPING+USS_FIXTURE_RECORDS+4*24,24)+16,32767);assert(!read_observation(0));
     observation_fixture(1,0,1,HF_SESSION_JOINER);assert(read_observation(0));
     observation_fixture(0,1,2,HF_SESSION_HOST);assert(read_observation(0));
     observation_fixture(1,0,1,HF_SESSION_HOST);advance_to(USS_REPLACE_DROP);assert(read_observation(0));

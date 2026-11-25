@@ -41,7 +41,7 @@ static void core_pair(void)
     reads=module_calls=session_calls=core_threads=0;
 }
 /* BEGIN GENERATED F6 DIAGNOSTICS BATTERY: every case freezes the accept/refuse outcome AND the exact number of game reads
- * measured on the code BEFORE the diagnostics were added; the detail checks were added with the diagnostics. */
+ * including the explicit18 reads per inventory sample for current/final layout checks; details retain their own assertions. */
 static void diag_check(const char* name,int valid,int want_valid,unsigned got_reads,unsigned want_reads)
 {
     if(want_reads==0xFFFFFFFFu)printf("MEASURE %s valid=%d reads=%u\n",name,valid,got_reads);
@@ -95,10 +95,10 @@ static void diagnostics_battery(void)
     assert(last_reader.detail && !strcmp(last_reader.detail,"PEER_ROLE_REMOTE"));
     for(byte=0;byte<32;++byte){
         core_fixture();core_pair();fixture(BASE+0x978AC0,32)[byte]^=0x40;current=core_read();
-        diag_check("member_pin_byte",current.valid,0,reads,122);
+        diag_check("member_pin_byte",current.valid,0,reads,140);
         assert(last_reader.stage && !strcmp(last_reader.stage,"CORE_MEMBER_PIN") && last_reader.detail && !strcmp(last_reader.detail,"MEMBER_PIN_BYTES"));
     }
-    core_fixture();fixture(BASE+0x978AC0,32)[5]^=0x40;current=core_read();diag_check("member_pin_unpaired_not_checked",current.valid,1,reads,241);
+    core_fixture();fixture(BASE+0x978AC0,32)[5]^=0x40;current=core_read();diag_check("member_pin_unpaired_not_checked",current.valid,1,reads,277);
 }
 /* END GENERATED F6 DIAGNOSTICS BATTERY */
 #ifndef USS_CORE_TEST_MAIN

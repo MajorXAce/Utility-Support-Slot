@@ -49,7 +49,7 @@ int main(void)
         normalized_quantities();drop_tick();assert(hud.drop.consumed==3 && u32(hud_allocation+0x394b44)==0 && hud_word_at(20)==UINT32_MAX);
         native_first_end();drop_tick();assert(hud.drop.stage==2 && hud.drop.consumed==7 && hud_word_at(20)==UINT32_MAX);
         put32(hud_allocation+0x394fdc,10);put32(hud_allocation+0x394fe8,102);normalized_quantities();
-        memcpy(&expected_name,weapon_assets+0x17c*0x38+0x30,8);drop_tick();
+        memcpy(&expected_name,weapon_assets+USS_HUD_FIXTURE_BIAS*0x38+0x30,8);drop_tick();
         assert(!hud.drop.active && !hud.drop.disabled && hud_word_at(20)==UINT32_MAX);
         assert(present_calls==(consumed?0u:10u));
         if(!consumed)assert(u32((void*)(present_widget()+0x1cc0+0x110))==201);

@@ -1,7 +1,12 @@
 #include "../src/uss_recovery_runtime.h"
 #define USS_RETAINED_TEST_MAIN retained_recovery_regressions
 #include "uss_automatic_retained_harness.c"
-static UssRecoveryRuntime recovery;static unsigned recovery_effects,recovery_sends,recovery_drops,recovery_fail,recovery_postread_fault;
+#ifdef USS_APP_STORAGE_FIXTURE
+#define recovery (candidate_app.recovery)
+#else
+static UssRecoveryRuntime recovery;
+#endif
+static unsigned recovery_effects,recovery_sends,recovery_drops,recovery_fail,recovery_postread_fault;
 static int recovery_own_effect(void* user,UssFormationEffect effect,uintptr_t first,uintptr_t second,
     uintptr_t record,uintptr_t inventory,uint32_t avatar,uint32_t value,const UssInventoryMessage* message)
 {
@@ -40,6 +45,9 @@ static void recovery_scene(unsigned outgoing_utility,unsigned selected,unsigned 
     recovery.native.reader.api=&fake;recovery.native.reader.mod=MOD;recovery.native.reader.platform.thread_id=core_thread;
     recovery.native.reader.policy=&automatic_runtime.policy;recovery.native.drop=recovery_own_drop;
     memcpy(segment(BASE+0x9a8840,sizeof(uss_death_drop_pin)),uss_death_drop_pin,sizeof(uss_death_drop_pin));
+    #ifdef USS_IDENTITY_EXTRA_WORLD
+    USS_IDENTITY_EXTRA_WORLD();
+    #endif
     assert(recovery_update()==USS_CONTROL_IDLE && recovery.real==real);
 }
 static void empty_support(unsigned consumed,unsigned selected)
@@ -61,16 +69,33 @@ static void finish_recovery(void)
 }
 /* Make the game delete an entity: its weapon-lookup entry disappears (as when the Solo Silo is destroyed and its remote is removed). */
 static unsigned char lost_saved[8];static unsigned char* lost_slot;
+static unsigned char destroyed_descriptor[24],destroyed_row[24];static uintptr_t destroyed_unit,destroyed_record;
 static void lose_entity(uint32_t entity)
 {
     unsigned char* rows=fixture(0x70000800,64);unsigned i;
     for(i=0;i<8;++i)if(u32(rows+i*8)==entity){lost_slot=rows+i*8;memcpy(lost_saved,lost_slot,8);
-        put32(lost_slot,UINT32_MAX);put32(lost_slot+4,UINT32_MAX);return;}
+        put32(lost_slot,UINT32_MAX);put32(lost_slot+4,UINT32_MAX);
+/* A missing lookup alone is not destruction: both corroborating sources
+         * must stop describing the same entity. Positive retention has separate cases. */
+        destroyed_record=MAPPING+USS_FIXTURE_RECORDS+(entity==103?0:1)*24;
+        memcpy(destroyed_row,fixture(destroyed_record,24),24);
+        put32(fixture(destroyed_record,24)+8,entity+(1u<<22));
+        destroyed_unit=0x70000900+(uintptr_t)(entity-101)*0x1000;
+        memcpy(destroyed_descriptor,fixture(destroyed_unit,24),24);
+        put32(fixture(destroyed_unit,24)+8,entity+(1u<<22));
+        return;}
     assert(0);
 }
-static void return_entity(void){memcpy(lost_slot,lost_saved,8);}
+static void return_entity(void){memcpy(lost_slot,lost_saved,8);
+    memcpy(fixture(destroyed_unit,24),destroyed_descriptor,24);
+    memcpy(fixture(destroyed_record,24),destroyed_row,24);
+}
 static HfTickCallback recovery_callback;static void* recovery_callback_user;
+#ifdef USS_APP_STORAGE_FIXTURE
+#define recovery_loop (candidate_app.loop)
+#else
 static UssGameplayLoop recovery_loop;
+#endif
 static int register_recovery_loop(HfMod* mod,HfTickCallback callback,void* user)
 {assert(mod==MOD);recovery_callback=callback;recovery_callback_user=user;return 1;}
 static int recovery_loop_policy(void* user,UssCoreFlags* output)
@@ -179,11 +204,14 @@ int USS_RECOVERY_TEST_MAIN(void)
         recovery_scene(utility,1,role);lose_entity(stored);
         assert(recovery_update()==USS_CONTROL_WORK && automatic_runtime.life.owner.pair_present && recovery.work.phase==USS_RECOVERY_IDLE);
         replacement_now+=100;assert(recovery_update()==USS_CONTROL_WORK && automatic_runtime.life.owner.pair_present);
-        replacement_now+=300;assert(recovery_update()==USS_CONTROL_WORK && !automatic_runtime.life.owner.pair_present);
+        replacement_now+=300;
+        if(utility){assert(recovery_update()==USS_CONTROL_STOP && automatic_runtime.life.owner.pair_present &&
+            !strcmp(recovery.reason,"STORED_ENTITY_CHANGED") && !recovery_effects);continue;}
+        assert(recovery_update()==USS_CONTROL_WORK && !automatic_runtime.life.owner.pair_present);
         assert(automatic_runtime.life.phase==USS_LIFE_EMPTY && !automatic_runtime.publication.record_present);
         assert(!recovery_effects && !recovery_sends && !recovery_drops && recovery.work.phase==USS_RECOVERY_IDLE);
         assert(!strcmp(recovery.reason,"STORED_MEMBER_LOST_PAIR_CLEARED"));
-        {char expected[96];snprintf(expected,sizeof(expected),"USS stored member %u no longer exists; pair cleared, real member %u",(unsigned)stored,(unsigned)real);
+        {char expected[96];snprintf(expected,sizeof(expected),"USS stored member %u uncorroborated after coherent lookup absence; pair cleared, real member %u",(unsigned)stored,(unsigned)real);
          assert(strstr(last_log,expected));}
         assert(u32(fixture(0x70000300,48)+8)==real && u32(fixture(0x70000300,48)+28)==1);
         before=recovery_effects;replacement_now+=25;assert(recovery_update()==USS_CONTROL_IDLE && recovery_effects==before);
@@ -215,7 +243,10 @@ int USS_RECOVERY_TEST_MAIN(void)
      replacement_now+=500;
      {UssCorePlatform platform={0};UssCoreFlags flags=uss_lifecycle_flags(&automatic_runtime.life,&core_flags);
       platform.thread_id=core_thread;reads=0;(void)uss_core_observe(&fake,MOD,&automatic_runtime.life.owner,&flags,&platform,NULL);core_reads=reads;}
-     reads=0;assert(recovery_update()==USS_CONTROL_WORK && !automatic_runtime.life.owner.pair_present);total=reads;
+     reads=0;assert(recovery_update()==USS_CONTROL_WORK && !automatic_runtime.life.owner.pair_present);total=reads-recovery.identity.query_budget.calls;
+     /* Corroboration failure is Lua-like nil, not failed qualified absence.
+      * Its separate failure cases may clear ordinary-real after clean absence;
+      * this sweep covers only the required recovery snapshot reads. */
      assert(core_reads>0 && total>core_reads+10 && total<2000);
      for(n=core_reads+1;n<=total;++n){
         recovery_scene(0,1,HF_SESSION_HOST);lose_entity(103);assert(recovery_update()==USS_CONTROL_WORK);

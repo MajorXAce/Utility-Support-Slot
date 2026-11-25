@@ -1,3 +1,7 @@
+#ifndef USS_HUD_FIXTURE_SLOTS
+#define USS_HUD_FIXTURE_SLOTS 1330
+#endif
+#define USS_HUD_FIXTURE_BIAS (16*USS_HUD_FIXTURE_SLOTS/56)
 /* Actual HUD context/readers and OWN private memory; no game process access. */
 #include "../src/uss_gameplay_application.h"
 #define USS_SOLO_TEST_MAIN hud_solo_regressions
@@ -8,7 +12,7 @@
 #define HUD_COMPONENT ((uintptr_t)0xd5300000)
 static UssHudRuntime hud;
 static unsigned char* hud_allocation;
-static unsigned char weapon_assets[0x6000],icon_assets[0x200];
+static unsigned char weapon_assets[0x12000],icon_assets[0x200];
 static uintptr_t hud_registry;static unsigned hud_reads,hud_table_reads,hud_override,fail_hud_postwrite,unknown_icon_lookup;
 static uintptr_t hud_projectile_table;static uint32_t hud_display_icon,hud_display_type;
 static uint32_t hud_word_at(unsigned offset){return u32(hud_allocation+0x394cd8+offset);}
@@ -39,8 +43,8 @@ static void hud_record(uint32_t entity,uint32_t count,uint32_t pending)
 {
     unsigned index=entity==103?1:0;
     memset(hud_allocation+0x394cd8,0,40);hud_word_at_set(0,10);
-    memcpy(hud_allocation+0x394cdc,weapon_assets+(0x17c+index)*0x38+8,4);
-    memcpy(hud_allocation+0x394ce0,weapon_assets+(0x17c+index)*0x38+0x30,8);
+    memcpy(hud_allocation+0x394cdc,weapon_assets+(USS_HUD_FIXTURE_BIAS+index)*0x38+8,4);
+    memcpy(hud_allocation+0x394ce0,weapon_assets+(USS_HUD_FIXTURE_BIAS+index)*0x38+0x30,8);
     hud_word_at_set(16,count);hud_word_at_set(20,pending);hud_word_at_set(24,count);hud_word_at_set(28,entity);hud_word_at_set(32,entity);
     memset(hud_allocation+0x394fdc,0,24);put32(hud_allocation+0x394fdc,10);
 }
@@ -49,10 +53,10 @@ static void hud_scene(void)
     unsigned i;const uint32_t keys[]={103},indexes[]={0};
     solo_scene(HF_SESSION_SOLO,0,0,1);(void)hud_solo_regressions;
     memset(hud_allocation,0,0x395000);memset(weapon_assets,0,sizeof(weapon_assets));memset(icon_assets,0,sizeof(icon_assets));
-    for(i=0;i<3;++i){uint32_t entity=102+i;unsigned char* row=weapon_assets+(0x17c+i)*0x38;
+    for(i=0;i<3;++i){uint32_t entity=102+i;unsigned char* row=weapon_assets+(USS_HUD_FIXTURE_BIAS+i)*0x38;
         const unsigned char* identity=entity==102?automatic_runtime.life.owner.ordinary.identity:
             entity==103?automatic_runtime.life.owner.utility.identity:fixture(0x70003900,24);
-        memcpy(weapon_assets+(0x532-3+i)*16,identity,8);put32(weapon_assets+(0x532-3+i)*16+8,i);
+        memcpy(weapon_assets+(USS_HUD_FIXTURE_SLOTS-3+i)*16,identity,8);put32(weapon_assets+(USS_HUD_FIXTURE_SLOTS-3+i)*16+8,i);
         put32(row+8,201+i);row[0x30]=(unsigned char)(31+i);row[0x37]=0xf1; /* High-bit opaque name. */
     }
     assert(fake_read(BASE+0x3326e68,&hud_registry,8)==0);
@@ -62,6 +66,9 @@ static void hud_scene(void)
         memcpy(icon_assets,descriptor,8);put32(icon_assets+8,0);put32(icon_assets+256,7);}
     for(i=0;i<sizeof(uss_hud_pins)/sizeof(uss_hud_pins[0]);++i)
         memcpy(segment(BASE+uss_hud_pins[i].rva,uss_hud_pins[i].size),uss_hud_pins[i].bytes,uss_hud_pins[i].size);
+    {unsigned j;for(j=0;j<3;++j){unsigned char* code=segment(BASE+hud_asset_sites[j],hud_asset_sizes[j]);uint32_t value=USS_HUD_FIXTURE_SLOTS-(j==2);
+        memcpy(code,hud_asset_prefix[j],hud_asset_offsets[j]);memcpy(code+hud_asset_offsets[j],&value,4);}
+      {uint32_t bias=USS_HUD_FIXTURE_BIAS;memcpy(fixture(BASE+uss_hud_pins[2].rva,uss_hud_pins[2].size)+11,&bias,4);}}
     hud_projectile_table=BASE+0x37c7670;hud_display_icon=777;hud_display_type=7;
     hud_reads=hud_table_reads=hud_override=fail_hud_postwrite=unknown_icon_lookup=0;fake.read=hud_fixture_read;
     uss_hud_runtime_init(&hud,&automatic_formation);automatic_formation.acknowledge=uss_hud_runtime_ack;
@@ -107,7 +114,7 @@ int USS_HUD_RUNTIME_TEST_MAIN(void)
     {Reader reader={0};reader.api=&fake;assert(!uss_hud_validate_pins(&reader,BASE));}
     fixture(BASE+0x5f576a,7)[0]^=1;
     /* A changed cached name must resolve again; opaque high bits survive. */
-    weapon_assets[(0x17c+1)*0x38+0x30]=99;
+    weapon_assets[(USS_HUD_FIXTURE_BIAS+1)*0x38+0x30]=99;
     before=hud_table_reads;assert(uss_hud_metadata(&hud.metadata,&fake,BASE,(uintptr_t)hud_allocation,allowed,&allowed[0],metadata));
     assert(hud_table_reads>before && metadata[4]==99 && metadata[11]==0xf1);
     /* Unknown component lookup is not evidence that the default icon applies. */

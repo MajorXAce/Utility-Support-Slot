@@ -115,7 +115,7 @@ int USS_LIFECYCLE_TEST_MAIN(void)
         assert(!uss_lifecycle_flags(&life,&core_flags).formed);
     }
     life_fixture(USS_PAIR_ORDINARY_FIRST);create(USS_PAIR_ORDINARY_FIRST,0);finish();
-    putptr(fixture(BASE+0x346BF98,8),MAPPING+8);lifecycle_snapshot=life_read();assert(lifecycle_snapshot.valid && life_apply(&lifecycle_snapshot));
+    coherent_manager_turnover();lifecycle_snapshot=life_read();assert(lifecycle_snapshot.valid && life_apply(&lifecycle_snapshot));
     assert(!life.owner.pair_present && life.phase==USS_LIFE_EMPTY);
     life_fixture(USS_PAIR_ORDINARY_FIRST);create(USS_PAIR_ORDINARY_FIRST,0);finish();
     core_state=HF_STATE_SHIP;put32(fixture(0xA0000000+0xAC21C,4),3);lifecycle_snapshot=life_read();assert(lifecycle_snapshot.valid && life_apply(&lifecycle_snapshot));

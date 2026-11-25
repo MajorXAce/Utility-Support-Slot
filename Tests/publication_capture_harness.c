@@ -6,6 +6,9 @@
 #define USS_ACTION_TEST_MAIN action_regression_checks
 #include "action_state_harness.c"
 #include "../src/publication_capture.h"
+#ifndef USS_FIXTURE_RECORDS
+#define USS_FIXTURE_RECORDS 0xF32F18
+#endif
 #define EXE ((uintptr_t)0xB0000000)
 #define SESSION ((uintptr_t)0xA2000000)
 #define MAPPING ((uintptr_t)0xA3000000)
@@ -39,6 +42,17 @@ static void hash_rows(uintptr_t at,uintptr_t data,unsigned capacity,const uint32
     putptr(header,data);put32(header+8,capacity);put32(header+12,UINT32_MAX);put32(header+16,1);memset(rows,0xff,capacity*8);
     for(i=0;i<count;++i){unsigned k=keys[i]&(capacity-1);while(u32(rows+k*8)!=UINT32_MAX)k=(k+1)&(capacity-1);put32(rows+k*8,keys[i]);put32(rows+k*8+4,indexes[i]);}
 }
+/* A new EntityManager lifetime must move all its aliases coherently. */
+static inline void coherent_manager_turnover(void)
+{
+    unsigned i;for(i=0;i<used;++i){uintptr_t at=segments[i].at;
+        if(at==MAPPING+0xF1AEB0 || at==MAPPING+0xF22EC8 ||
+           (at>=MAPPING+USS_FIXTURE_RECORDS && at<MAPPING+USS_FIXTURE_RECORDS+32*24))segments[i].at+=8;
+    }
+    fixture_avatar_record+=8;putptr(fixture(0x70000200,8),fixture_avatar_record);
+    putptr(fixture(BASE+0x3326B90,8),MAPPING+8+0x1440);
+    putptr(fixture(BASE+0x346BF98,8),MAPPING+8);
+}
 static UssCaptureProducer producer(void)
 {
     UssCaptureProducer result={0};result.api=&fake;result.mod=MOD;result.input=input_snapshot;
@@ -50,8 +64,14 @@ static void capture_fixture(void)
     static const unsigned char silo[8]={0xaa,0x79,0xca,0x92,0x05,0x46,0x13,0xfc};
     static const unsigned char state_pin[7]={0x48,0x8b,0x0d,0x15,0x23,0x1e,0x03};
     static const uint32_t handles[4]={22,101,103,102},positions[4]={3,2,0,1},wires[4]={50,51,52,53};
-    unsigned i;unsigned char* b;uintptr_t descriptors[4]={0x20000000+0xF31AD8,0x70000900,0x70002900,0x70001900};
+    unsigned i;unsigned char* b;uintptr_t descriptors[4]={fixture_avatar_record,0x70000900,0x70002900,0x70001900};
     distinct_slots();fake.module_base=module_capture;initial_role=HF_SESSION_HOST;
+    /* Constructor-qualified owner alias and a single canonical avatar record.
+     * Move the segment itself so writes cannot update an unused duplicate. */
+    for(i=0;i<used;++i)if(segments[i].at==fixture_avatar_record){segments[i].at=MAPPING+USS_FIXTURE_RECORDS+3*24;break;}
+    assert(i<used);fixture_avatar_record=MAPPING+USS_FIXTURE_RECORDS+3*24;descriptors[0]=fixture_avatar_record;
+    putptr(fixture(0x70000200,8),fixture_avatar_record);
+    putptr(fixture(BASE+0x3326B90,8),MAPPING+0x1440);
     input_calls=input_change=query_calls=query_fail=path_fail=export_fail=thread_change=query_change=0;
     memcpy(segment(BASE+0xA93ECD,7),(unsigned char[]){0x4c,0x8b,0x35,0x4c,0x2e,0x89,0x02},7);
     ptr_segment(BASE+0x3326D20,ACTION_MANAGER);word_segment(ACTION_MANAGER+0x70,1);
@@ -67,10 +87,11 @@ static void capture_fixture(void)
     b=fixture(0x70000700,144);put32(b+4,22);put32(b+48+4,22);put32(b+96+4,22);put32(b+48+12,2);put32(b+96+12,2);
     memcpy(fixture(0x70002900,24),silo,8);
     for(i=0;i<4;++i){b=fixture(descriptors[i],24);put32(b+16,wires[i]);put32(b+20,1);}
-    ptr_segment(BASE+0x346BF98,MAPPING);
+    putptr(fixture(BASE+0x346BF98,8),MAPPING);
     hash_rows(MAPPING+0xF1AEB0,0xA3010000,8,handles,positions,4);
-    hash_rows(MAPPING+0xF22EC8,0xA3020000,8,wires,positions,4);
-    for(i=0;i<4;++i)memcpy(segment(MAPPING+0xF32F18+(uintptr_t)positions[i]*24,24),fixture(descriptors[i],24),24);
+    {const uint32_t network_keys[]={11,50,51,52,53},network_rows[]={3,3,2,0,1};hash_rows(MAPPING+0xF22EC8,0xA3020000,8,network_keys,network_rows,5);}
+    for(i=1;i<4;++i)memcpy(segment(MAPPING+USS_FIXTURE_RECORDS+(uintptr_t)positions[i]*24,24),fixture(descriptors[i],24),24);
+    /* The owner network lookup and EntityManager network lookup are one header. */
     ptr_segment(BASE+0x3326E68,0x91000000);word_segment(0x910006C0,1);
     b=segment(0x910006C8,16);putptr(b,0x91001000);put32(b+8,141);segment(0x91001020,20);
     ptr_segment(BASE+0x3326698,0x92000000);
@@ -89,6 +110,7 @@ static void capture_fixture(void)
     memcpy(segment(EXE+0xA40C0,7),(unsigned char[]){0x48,0xff,0x25,0xf9,0x25,0x35,1},7);
     ptr_segment(EXE+0x13F66B8,0xE0001000);ptr_segment(EXE+0x13F66C0,0xE0002000);ptr_segment(EXE+0x13F6628,0xE0003000);
     for(i=0;i<sizeof(capture_pins)/sizeof(capture_pins[0]);++i){const UssCapturePin* pin=&capture_pins[i];memcpy(segment((pin->exe?EXE:BASE)+pin->rva,pin->size),pin->bytes,pin->size);}
+    {int32_t raw=(USS_FIXTURE_RECORDS+16)/24;memcpy(fixture(BASE+0xFD9A40,sizeof(capture_pin_1))+0x9D,&raw,4);}
     memcpy(segment(BASE+0xBDE452,11),(unsigned char[]){0x45,0x8b,0xf9,0x4d,0x8b,0xf0,0x48,0x8b,0xfa,0x8b,0xe9},11);
     ptr_segment(EXE+0x13F6690,EXE+0x2C6E642);memcpy(segment(EXE+0x2C6E642,5),(unsigned char[]){0xe9,0xda,0x41,0x2f,0},5);
     ptr_segment(EXE+0x1A10278,0xA7000000);ptr_segment(0xA7000000,0xA7100000);
@@ -105,6 +127,9 @@ static void capture_fixture(void)
     memset(&capture_input,0,sizeof(capture_input));capture_input.pair_generation=capture_input.context_generation=1;
     capture_input.utility=103;capture_input.ordinary=102;capture_input.callback_thread=7;
     memcpy(capture_input.utility_identity,silo,8);memcpy(capture_input.ordinary_identity,fixture(0x70001900,24),8);
+#ifdef USS_CAPTURE_FIXTURE_COALESCE
+    USS_CAPTURE_FIXTURE_COALESCE();
+#endif
     assert(sample(&capture_input.owner));reads=module_calls=session_calls=0;memset(&last_reader,0,sizeof(last_reader));
 }
 static int observe(UssPublicationCapture* output){UssCaptureProducer p=producer();return uss_capture_publication(&p,output,&last_reader);}
@@ -171,11 +196,14 @@ int USS_CAPTURE_TEST_MAIN(void)
     ptr_segment(0xA7500018,EXE+0x293F50);assert(observe(&output));
     capture_fixture();fixture(0xA7100000,16)[5]=1;ptr_segment(0xA7500090,EXE+0x34FF40);assert(observe(&output));
     capture_fixture();{uint64_t metadata=UINT64_C(0xfedcba9876543210);memcpy(fixture(0x70000300,48)+40,&metadata,8);
-        assert(sample(&capture_input.owner));reads=module_calls=session_calls=0;
+    #ifdef USS_CAPTURE_FIXTURE_COALESCE
+    USS_CAPTURE_FIXTURE_COALESCE();
+#endif
+    assert(sample(&capture_input.owner));reads=module_calls=session_calls=0;
         assert(observe(&output) && !memcmp(output.owner.row+40,&metadata,8));}
     capture_fixture();{
-        unsigned char descriptor[24];memcpy(descriptor,fixture(MAPPING+0xF32F18+3*24,24),24);
-        memcpy(segment(MAPPING+0xF32F18+4*24,24),descriptor,24);
+        unsigned char descriptor[24];memcpy(descriptor,fixture(MAPPING+USS_FIXTURE_RECORDS+3*24,24),24);
+        memcpy(segment(MAPPING+USS_FIXTURE_RECORDS+4*24,24),descriptor,24);
         /* Reverse avatar index4 differs from forward3 and owner index0. */
         put32(fixture(0xA3020000,64)+(50&7)*8+4,4);assert(observe(&output));
     }
@@ -205,9 +233,9 @@ int USS_CAPTURE_TEST_MAIN(void)
     capture_fixture();put32(fixture(0xA0000000+0xAC218,4),1);rejected_capture();
     capture_fixture();put32(fixture(0xA0000000+0xAC21C,4),0);rejected_capture();
     capture_fixture();put32(fixture(0x70000700,144)+96+4,0);rejected_capture();
-    capture_fixture();put32(fixture(MAPPING+0xF32F18,24)+8,104);rejected_capture();
-    capture_fixture();put32(fixture(MAPPING+0xF32F18,24)+16,32767);rejected_capture();
-    capture_fixture();fixture(MAPPING+0xF32F18,24)[20]=0;rejected_capture();
+    capture_fixture();put32(fixture(MAPPING+USS_FIXTURE_RECORDS,24)+8,104);rejected_capture();
+    capture_fixture();put32(fixture(MAPPING+USS_FIXTURE_RECORDS,24)+16,32767);rejected_capture();
+    capture_fixture();fixture(MAPPING+USS_FIXTURE_RECORDS,24)[20]=0;rejected_capture();
     capture_fixture();put32(fixture(0x910006C0,4),33);rejected_capture();
     capture_fixture();put32(fixture(0x91001020,20)+8,3);rejected_capture();
     capture_fixture();{const uint32_t keys[]={103},index[]={0};

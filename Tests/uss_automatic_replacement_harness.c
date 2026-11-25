@@ -15,7 +15,7 @@ static int replacement_formation_effect(void* user,UssFormationEffect effect,uin
 static void map_incoming(unsigned utility)
 {
     const uint32_t handles[]={22,101,103,102,104},positions[]={3,2,0,1,4},wires[]={50,51,52,53,54};
-    uintptr_t descriptors[]={0x20000000+0xf31ad8,0x70000900,0x70002900,0x70001900,0x70003900};
+    uintptr_t descriptors[]={fixture_avatar_record,0x70000900,0x70002900,0x70001900,0x70003900};
     unsigned i,k;unsigned char* data;extra_candidate();
     if(!utility){data=fixture(0x70003900,24);memset(data,0,8);data[0]=8;}
     for(i=0;i<5;++i){data=fixture(descriptors[i],24);put32(data+16,wires[i]);put32(data+20,1);
@@ -25,6 +25,7 @@ static void map_incoming(unsigned utility)
     for(i=0;i<5;++i){k=handles[i]&7;while(u32(data+k*8)!=UINT32_MAX)k=(k+1)&7;put32(data+k*8,handles[i]);put32(data+k*8+4,positions[i]);}
     data=fixture(0xa3020000,64);memset(data,0xff,64);
     for(i=0;i<5;++i){k=wires[i]&7;while(u32(data+k*8)!=UINT32_MAX)k=(k+1)&7;put32(data+k*8,wires[i]);put32(data+k*8+4,positions[i]);}
+    {k=11&7;while(u32(data+k*8)!=UINT32_MAX)k=(k+1)&7;put32(data+k*8,11);put32(data+k*8+4,3);}
     put32(fixture(0x92000018,20)+8,8);data=fixture(0x92000100,64);memset(data,0xff,64);
     for(i=0;i<4;++i){uint32_t entity=101+i,index=entity==101?2:entity==103?0:entity==102?1:3;
         k=entity&7;put32(data+k*8,entity);put32(data+k*8+4,index);if(i==3)word_segment(0x92001000+index*172,1);}

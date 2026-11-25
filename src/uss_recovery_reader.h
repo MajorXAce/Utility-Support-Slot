@@ -57,7 +57,13 @@ static inline int uss_recovery_observe(const UssRecoveryReader* source,const Uss
     if(!uss_member_pin_matches(pin)){output->refusal=USS_RECOVERY_REFUSAL_CONTRACT;return 0;}
     result.death=!publication_id(result.inventory.slots[0]) || !publication_id(result.inventory.slots[1]);
     result.all_empty=result.inventory.slots[0]==0 && result.inventory.slots[1]==0 && result.inventory.slots[2]==0 && result.inventory.slots[3]==0;
-    if(!result.death && result.inventory.slots[2]!=0 && result.inventory.slots[2]!=work->survivor.entity){output->refusal=USS_RECOVERY_REFUSAL_CONTEXT_CHANGED;return 0;}
+    /* A counter-qualified preflight may verify that the original real member
+     * still occupies its native slot. Active restore work never accepts that
+     * shape; the caller may only abandon preflight without an effect. */
+    if(!result.death && result.inventory.slots[2]!=0 && result.inventory.slots[2]!=work->survivor.entity &&
+        !(work->phase==USS_RECOVERY_IDLE && work->native_entries_known && result.inventory.slots[2]==work->outgoing.entity)){
+        output->refusal=USS_RECOVERY_REFUSAL_CONTEXT_CHANGED;return 0;
+    }
     if(!recovery_member(&memory,before.game,&result.inventory,&work->survivor,&result.survivor,&survivor_absent))return 0;
     if(survivor_absent){output->refusal=USS_RECOVERY_REFUSAL_SURVIVOR_ABSENT;return 0;} /* a CLEAN empty bucket, never a failed read */
     if(!recovery_member(&memory,before.game,&result.inventory,&work->outgoing,&result.outgoing,&result.outgoing_absent))return 0;

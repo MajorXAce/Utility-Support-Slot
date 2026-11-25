@@ -53,12 +53,34 @@ static inline int uss_hud_projectile_table(Reader* reader,uintptr_t base,uintptr
     {unsigned char first_slot[8];if(!get(reader,target,first_slot,8))return 0;}
     *table=target;return 1;
 }
+/* Source a4898611 table_growth_sites: component76, stride56, S divisible7.
+ * Three independent S forms and the exact scaled record-start immediate agree. */
+typedef struct UssHudAssetLayout {uint32_t slots,bias;unsigned char code[4][7];} UssHudAssetLayout;
+static const uint32_t hud_asset_sites[4]={0x4F8A83,0x4F8ABD,0x4F8AB4,0x4F8AD1};
+static const unsigned hud_asset_sizes[4]={6,7,5,7},hud_asset_offsets[4]={2,3,1,3};
+static const unsigned char hud_asset_prefix[4][3]={{0x69,0xc0,0},{0x41,0x81,0xf9},{0x3d,0,0},{0x48,0x81,0xc1}};
+static int hud_asset_layout(Reader* r,uintptr_t base,UssHudAssetLayout* output)
+{
+    UssHudAssetLayout result={0};uint32_t values[4];unsigned i;size_t size;
+    if(r->api->module_base("game.dll",&size)!=base || size<0x4F8AD8 || size>0x20000000 || !address_ok(base,size))return 0;
+    for(i=0;i<4;++i){
+        if(!get(r,base+hud_asset_sites[i],result.code[i],hud_asset_sizes[i]) ||
+            memcmp(result.code[i],hud_asset_prefix[i],hud_asset_offsets[i]))return 0;
+        values[i]=u32(result.code[i]+hud_asset_offsets[i]);
+    }
+    if(values[0]<1330 || values[0]>134217727 || values[0]%7 || values[1]!=values[0] ||
+        values[2]!=values[0]-1 || (uint64_t)values[3]*56!=(uint64_t)values[0]*16)return 0;
+    result.slots=values[0];result.bias=values[3];*output=result;return 1;
+}
+static int hud_asset_layout_final(Reader* r,uintptr_t base,const UssHudAssetLayout* before)
+{UssHudAssetLayout after;return hud_asset_layout(r,base,&after) && !memcmp(before,&after,sizeof(after));}
 typedef struct UssHudPinDiagnostic {
     const char* stage;uint32_t index,rva,size,offset,expected,actual;
 } UssHudPinDiagnostic;
 static inline int uss_hud_validate_pins_diagnose(Reader* reader,uintptr_t base,UssHudPinDiagnostic* diagnostic)
 {
-    unsigned i;unsigned char bytes[36];uintptr_t table=0;
+    unsigned i;unsigned char bytes[36];uintptr_t table=0;UssHudAssetLayout layout;
+    if(!hud_asset_layout(reader,base,&layout))return 0;
     for(i=0;i<sizeof(uss_hud_pins)/sizeof(uss_hud_pins[0]);++i){
         const UssHudPin* pin=&uss_hud_pins[i];
         if(diagnostic){memset(diagnostic,0,sizeof(*diagnostic));diagnostic->stage="HUD_PIN_READ";
@@ -70,12 +92,15 @@ static inline int uss_hud_validate_pins_diagnose(Reader* reader,uintptr_t base,U
             }
             continue;
         }
+        if(i==2){unsigned char expected[36];memcpy(expected,pin->bytes,pin->size);memcpy(expected+11,&layout.bias,4);
+            if(memcmp(bytes,expected,pin->size))return 0;continue;}
         if(memcmp(bytes,pin->bytes,pin->size)){
             unsigned at;for(at=0;at<pin->size && bytes[at]==pin->bytes[at];++at){}
             if(diagnostic){diagnostic->stage="HUD_PIN_MISMATCH";diagnostic->offset=at;
                 diagnostic->expected=pin->bytes[at];diagnostic->actual=bytes[at];}return 0;
         }
     }
+    if(!hud_asset_layout_final(reader,base,&layout))return 0;
     if(diagnostic)diagnostic->stage="HUD_PINS_MATCH";
     return 1;
 }

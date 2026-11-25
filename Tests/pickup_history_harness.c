@@ -90,7 +90,7 @@ int USS_HISTORY_TEST_MAIN(void)
     history_fixture(0);bundle=read_support(102,1);step(&bundle);core_state=HF_STATE_SHIP;
     put32(fixture(0xA0000000+0xAC21C,4),3);bundle=candidates();assert(step(&bundle).kind==USS_PICKUP_RESET && !history.bound);
     history_fixture(0);bundle=read_support(102,1);step(&bundle);
-    putptr(fixture(BASE+0x346BF98,8),MAPPING+8);recover_scope();bundle=read_support(103,1);
+    coherent_manager_turnover();recover_scope();bundle=read_support(103,1);
     assert(step(&bundle).kind==USS_PICKUP_REMEMBERED && !candidate_life.owner.pair_present);
     /* Third pickup produces typed, supersedable intent, not membership/effects. */
     history_fixture(1);extra_candidate();bundle=read_support(104,1);generation=candidate_life.owner.pair_generation;

@@ -7,6 +7,7 @@
 #include "publication_capture.h"
 typedef struct UssHudMetadataRead {const HfApi* api;unsigned calls,bytes;} UssHudMetadataRead;
 typedef struct UssHudMetadataEntry {
+    UssHudAssetLayout layout;
     unsigned valid,override;uintptr_t root,owner,weapons,icons,name_address,icon_address,projectile_table;
     UssPairMember member;unsigned char display[12];
 } UssHudMetadataEntry;
@@ -104,7 +105,9 @@ static inline int uss_hud_metadata(UssHudMetadata* cache,const HfApi* api,uintpt
     unsigned char check[12],zero[8]={0};unsigned i,slot=0;Reader table_reader={0};uintptr_t table=0,end_table=0;
     if(!cache || !member || !allowed || !root || !output ||
         (!pair_member_equal(member,&allowed[0]) && !pair_member_equal(member,&allowed[1])) || !hud_metadata_unit(api,base,member))return 0;
+    UssHudAssetLayout layout;
     io.api=api;table_reader.api=api;
+    if(!hud_asset_layout(&table_reader,base,&layout))return 0;
     if(!uss_hud_projectile_table(&table_reader,base,&table))return 0;
     if(!hud_metadata_pointer(&io,base+0x346bf98,&owner) || !hud_metadata_pointer(&io,owner+0xf126d8,&weapons) ||
         !hud_metadata_pointer(&io,owner+0xf129f8,&icons))return 0;
@@ -112,13 +115,13 @@ static inline int uss_hud_metadata(UssHudMetadata* cache,const HfApi* api,uintpt
         if(old->valid && (!pair_member_equal(&old->member,&allowed[0]) && !pair_member_equal(&old->member,&allowed[1])))old->valid=0;
         if(old->valid && pair_member_equal(&old->member,member)){
             slot=i;
-            if(!old->override && old->projectile_table==table && old->root==root && old->owner==owner && old->weapons==weapons && old->icons==icons &&
+            if(!old->override && old->projectile_table==table && old->root==root && old->owner==owner && old->weapons==weapons && old->icons==icons && !memcmp(&old->layout,&layout,sizeof(layout)) &&
                 hud_metadata_read(&io,old->name_address,check+4,8) && hud_metadata_read(&io,old->icon_address,check,4) &&
-                !memcmp(check,old->display,12) && uss_hud_projectile_table(&table_reader,base,&end_table) && end_table==table){memcpy(output,check,12);return 1;}
+                !memcmp(check,old->display,12) && uss_hud_projectile_table(&table_reader,base,&end_table) && end_table==table && hud_asset_layout_final(&table_reader,base,&layout)){memcpy(output,check,12);return 1;}
             old->valid=0;
         }else if(!old->valid)slot=i;
     }
-    if(hud_metadata_asset(&io,owner+0xf126d8,member->identity,0x532,0x17c,0x38,&weapon)!=1 ||
+    if(hud_metadata_asset(&io,owner+0xf126d8,member->identity,layout.slots,layout.bias,0x38,&weapon)!=1 ||
         !hud_metadata_read(&io,weapon+0x30,result.display+4,8) || !memcmp(result.display+4,zero,8) ||
         !hud_metadata_read(&io,weapon+8,result.display,4) || !hud_metadata_pointer(&io,base+0x3326e68,&system))return 0;
     result.icon_address=weapon+8;
@@ -127,8 +130,8 @@ static inline int uss_hud_metadata(UssHudMetadata* cache,const HfApi* api,uintpt
         !hud_metadata_pointer(&io,owner+0xf126d8,&again) || again!=weapons ||
         !hud_metadata_pointer(&io,owner+0xf129f8,&again) || again!=icons || !hud_metadata_unit(api,base,member) ||
         !hud_metadata_read(&io,weapon+0x30,check+4,8) || !hud_metadata_read(&io,result.icon_address,check,4) ||
-        memcmp(check,result.display,12) || !uss_hud_projectile_table(&table_reader,base,&end_table) || end_table!=table)return 0;
-    result.projectile_table=table;result.override=result.icon_address!=weapon+8;
+        memcmp(check,result.display,12) || !uss_hud_projectile_table(&table_reader,base,&end_table) || end_table!=table || !hud_asset_layout_final(&table_reader,base,&layout))return 0;
+    result.layout=layout;result.projectile_table=table;result.override=result.icon_address!=weapon+8;
     result.valid=1;result.member=*member;result.root=root;result.owner=owner;result.weapons=weapons;result.icons=icons;
     result.name_address=weapon+0x30;cache->entries[slot]=result;memcpy(output,result.display,12);return 1;
 }

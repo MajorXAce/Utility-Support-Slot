@@ -1,4 +1,4 @@
-/* Finite drop/use/death recovery. This owns an operation record from an actual
+/* Drop/use/death recovery with qualified pre-entry waits. This owns an operation record from an actual
  * published pair; it never fabricates a pair after the native slot is emptied. */
 #ifndef USS_RECOVERY_H
 #define USS_RECOVERY_H
@@ -16,8 +16,9 @@ typedef enum UssRecoveryEffect {
  * established; a valid snapshot keeps 0, so snapshot comparisons are unchanged. TRANSIENT means "could not read or coherently
  * confirm" (the only kind a not-yet-effected recovery may wait out); the others are definitive and are never waited out. */
 enum { USS_RECOVERY_REFUSAL_TRANSIENT=0,USS_RECOVERY_REFUSAL_SURVIVOR_ABSENT,USS_RECOVERY_REFUSAL_CONTEXT_CHANGED,USS_RECOVERY_REFUSAL_CONTRACT };
-/* A recovery that has not yet entered its restore effect has changed nothing natively. It may wait this long (Lua waits without
- * a limit) for a transient native state to settle; every later phase keeps its own 2000 ms window from the effect. */
+/* Unknown-history callers retain the finite legacy wait. The actual runtime may
+ * suspend before entry while its saved counter and ownership remain unchanged;
+ * every later phase keeps its own finite window after the restore. */
 enum { USS_RECOVERY_RESTORE_WAIT_MS=10000,USS_RECOVERY_PHASE_WINDOW_MS=2000 };
 typedef struct UssRecoverySnapshot {
     unsigned valid,death,all_empty,outgoing_absent;Inventory inventory;
@@ -31,6 +32,10 @@ typedef struct UssRecoveryWork {
     /* Set by recovery_effect when the restore was refused before ANY native entry (and its consumed bit was given back), and the
      * earliest tick at which the pre-effect wait may try the restore again. */
     unsigned refused_before_entry;uint64_t retry_after;
+    /* Actual runtime counter at begin. Unknown history never authorizes policy
+     * deferral. The barrier is set before a service call and cleared only after
+     * a failed first restore proves that no native entry occurred. */
+    unsigned native_entries_known,native_entries_start,entry_barrier,policy_deferred;
 } UssRecoveryWork;
 typedef struct UssRecoveryIo {
     void* user;int (*observe)(void*,const UssRecoveryWork*,UssRecoverySnapshot*);
@@ -44,10 +49,10 @@ typedef struct UssRecoveryIo {
 enum { USS_RECOVERY_RETRY_MS=100 };
 static inline unsigned recovery_cancel(UssRecoveryWork* work,const char* reason)
 {work->phase=USS_RECOVERY_CANCELLED;work->reason=reason;return USS_CONTROL_STOP;}
-/* True only while nothing native has been entered for this recovery: the restore effect's bit is still clear in the ATTACH phase.
- * Waiting then costs nothing and repeats nothing; the effect itself still revalidates a fresh observation when it finally runs. */
+/* Structural pre-entry state. Runtime ownership and the actual saved entry
+ * counter are checked separately before extending a wait or admitting a call. */
 static inline int recovery_pre_effect_wait(const UssRecoveryWork* work)
-{return work->phase==USS_RECOVERY_ATTACH && !(work->consumed&(1u<<(unsigned)USS_RECOVERY_RESTORE));}
+{return work->phase==USS_RECOVERY_ATTACH && !work->entry_barrier && !(work->consumed&(1u<<(unsigned)USS_RECOVERY_RESTORE));}
 static inline uint64_t recovery_deadline(const UssRecoveryWork* work)
 {return recovery_pre_effect_wait(work)?work->started+USS_RECOVERY_RESTORE_WAIT_MS:work->deadline;}
 static inline int recovery_lifetime(const UssRecoveryWork* work,const UssPairOwner* owner)
@@ -59,14 +64,19 @@ static inline int recovery_lifetime(const UssRecoveryWork* work,const UssPairOwn
 static inline int recovery_effect(UssRecoveryWork* work,const UssRecoveryIo* io,const UssRecoverySnapshot* snapshot,
     UssRecoveryEffect effect,uint32_t slot)
 {
-    unsigned bit=1u<<(unsigned)effect,before=io->entries?io->entries(io->user):0;int result;
+    unsigned bit=1u<<(unsigned)effect,before=io->entries?io->entries(io->user):0,prior_barrier=work->entry_barrier;int result;
+    if(effect==USS_RECOVERY_RESTORE && (work->entry_barrier ||
+        (work->native_entries_known && (!io->entries || before!=work->native_entries_start)))){
+        work->refused_before_entry=0;return 0;
+    }
     if((work->consumed&bit) || !io->effect)return 0;
-    work->consumed|=bit;work->refused_before_entry=0;
+    work->consumed|=bit;work->refused_before_entry=0;work->entry_barrier=1;
     result=io->effect(io->user,work,snapshot,effect,slot);
     /* Only the restore, and only while recovery is still before its first effect: a refusal that entered no native call is not
      * an attempted restore (the same rule the readiness wait already follows), so the bit is given back. */
-    if(!result && effect==USS_RECOVERY_RESTORE && io->entries && io->entries(io->user)==before){
-        work->consumed&=~bit;work->refused_before_entry=1;}
+    if(!result && effect==USS_RECOVERY_RESTORE && io->entries && !prior_barrier && work->native_entries_known &&
+        before==work->native_entries_start && io->entries(io->user)==before){
+        work->consumed&=~bit;work->entry_barrier=0;work->refused_before_entry=1;}
     return result;
 }
 static inline int recovery_publication_owned(const UssPublicationState* publication,const UssPairOwner* owner)
@@ -107,7 +117,10 @@ static inline unsigned uss_recovery_tick(UssRecoveryWork* work,UssCoreLifecycle*
     if(work->phase==USS_RECOVERY_IDLE || work->phase==USS_RECOVERY_COMPLETE)return USS_CONTROL_IDLE;
     if(work->phase==USS_RECOVERY_CANCELLED)return USS_CONTROL_STOP;
     if(now<work->started || !recovery_lifetime(work,&life->owner))return recovery_cancel(work,"RECOVERY_LIFETIME_CHANGED");
-    if(now>=recovery_deadline(work))
+    if(work->phase==USS_RECOVERY_ATTACH && work->native_entries_known &&
+        (!io->entries || io->entries(io->user)!=work->native_entries_start || work->entry_barrier || work->consumed))
+        return recovery_cancel(work,"RECOVERY_ENTRY_HISTORY_CHANGED");
+    if(!(recovery_pre_effect_wait(work) && work->native_entries_known) && now>=recovery_deadline(work))
         return recovery_cancel(work,recovery_pre_effect_wait(work)?"RECOVERY_RESTORE_WAIT_EXPIRED":"RECOVERY_PHASE_TIMEOUT");
     if(!io->observe(io->user,work,&snapshot) || !snapshot.valid){
         /* Before any effect a transient read failure is a wait, not a verdict. A definitive refusal is never waited out. */
@@ -137,20 +150,21 @@ static inline unsigned uss_recovery_tick(UssRecoveryWork* work,UssCoreLifecycle*
     if(work->phase==USS_RECOVERY_ATTACH){
         if(snapshot.inventory.slots[2]!=0)return recovery_cancel(work,"RECOVERY_EMPTY_SELECTION_CHANGED");
         /* Vanilla may not have left the emptied support slot yet (a knockdown can delay it). Nothing is selected or attached by
-         * us until it does; wait for it, as Lua does, inside the pre-effect bound. */
+         * us until it does; wait for it, as Lua does, while the pre-entry proof remains current. */
         if(snapshot.inventory.active_selector!=1 && snapshot.inventory.active_selector!=2){work->reason="WAIT_RECOVERY_SELECTION";return USS_CONTROL_WORK;}
         /* A transient native selection block is not an attempted restore.
-         * Observe again within the original deadline, before consuming effects. */
+         * Observe again at the scheduled cadence, before consuming effects. */
         if(snapshot.primary.valid && (snapshot.primary.fields.global_guard ||
             snapshot.primary.fields.state_byte || u32(snapshot.primary.fields.row+28))){
             work->reason="WAIT_RECOVERY_RESTORE_READY";return USS_CONTROL_WORK;
         }
-        /* If recovery began while the selection still pointed at the emptied support slot (3), restore the settled selection instead:
-         * the final selection effect only supports slots 1 and 2. The value is the one just verified in this snapshot. */
-        if(work->selected!=1 && work->selected!=2)work->selected=snapshot.inventory.active_selector;
+        /* The current coherent choice supplies the final return selection.
+         * This is not a lifetime generation: it may change before first entry.
+         * Later phases keep this value once the restore service has entered. */
+        work->selected=snapshot.inventory.active_selector;
         if(now<work->retry_after){work->reason="WAIT_RECOVERY_RESTORE_RETRY";return USS_CONTROL_WORK;}
         if(!recovery_effect(work,io,&snapshot,USS_RECOVERY_RESTORE,0)){
-            if(work->refused_before_entry){ /* nothing was entered: wait and try again, at a bounded rate, within the pre-effect limit */
+            if(work->refused_before_entry){ /* nothing was entered: wait and try again, at a bounded rate while the pre-entry proof remains current */
                 work->refused_before_entry=0;work->retry_after=now+USS_RECOVERY_RETRY_MS;
                 work->reason="WAIT_RECOVERY_RESTORE_REFUSED_BEFORE_ENTRY";return USS_CONTROL_WORK;}
             return recovery_cancel(work,"SURVIVOR_RESTORE_FAILED");

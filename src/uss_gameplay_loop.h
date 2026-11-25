@@ -24,7 +24,8 @@ typedef struct UssGameplayLoopIo {
     void (*frame)(void*,float); /* Optional UI step: each valid callback, before gameplay throttle/policy. */
     /* Optional, log-only: the fixed text naming why the last policy call refused. Never a decision input. */
     const char* (*policy_reason)(void*);
-    /* True only for an established input/UI block while all transactions are idle.
+    /* True only for an established input/UI block with idle transactions or a
+     * separately qualified zero-entry recovery; never an entered effect.
      * Defer this tick without reads/effects or changing owner interruption tokens. */
     int (*policy_defer_idle)(void*);
 } UssGameplayLoopIo;

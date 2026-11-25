@@ -95,7 +95,7 @@ int USS_CANDIDATE_TEST_MAIN(void)
     bundle=candidates();assert(!bundle.valid && bundle.current.valid && !bundle.current.mission);
     candidate_fixture(0);initial_role=HF_SESSION_SOLO;assert(!candidates().valid);
     candidate_fixture(1);bundle=candidates();assert(bundle.valid && bundle.current.pair_matched);
-    assert(bundle.members[0].entity==bundle.current.utility.entity && reads==306);
+    assert(bundle.members[0].entity==bundle.current.utility.entity && reads==342);
     stale=bundle;generation=candidate_life.owner.pair_generation;
     assert(uss_pair_owner_clear_pair(&candidate_life.owner,7,generation));
     assert(uss_pair_owner_set_pair(&candidate_life.owner,7,0,&request.members[0],&request.members[1]));

@@ -76,13 +76,13 @@ int main(void)
     put32(action_row()+28,1);scene_run(30,100);put32(action_row()+28,0);scene_run(40,25);scene_check("primary_blocked_3s",survivor,"COMPLETE","LONE_RECOVERY_COMPLETE",2,102,0);
     /* The same block lasting 12 s. */
     recovery_scene(1,1,HF_SESSION_HOST);empty_support(1,1);scene_run(1,25);
-    put32(action_row()+28,1);scene_run(120,100);put32(action_row()+28,0);scene_run(40,25);scene_check("primary_blocked_12s",survivor,"CANCELLED","RECOVERY_RESTORE_WAIT_EXPIRED",0,0,1);
+    put32(action_row()+28,1);scene_run(120,100);put32(action_row()+28,0);scene_run(40,25);scene_check("primary_blocked_12s",survivor,"COMPLETE","LONE_RECOVERY_COMPLETE",2,102,0);
     /* The survivor is deleted by the game while recovery waits. */
     recovery_scene(1,1,HF_SESSION_HOST);empty_support(1,1);scene_run(1,25);
     lose_entity(survivor);scene_run(40,100);scene_check("survivor_deleted",survivor,"CANCELLED","RECOVERY_SURVIVOR_GONE",0,0,1);
     /* A different actor/session lifetime appears mid-recovery. */
     recovery_scene(1,1,HF_SESSION_HOST);empty_support(1,1);scene_run(1,25);
-    ++automatic_runtime.life.owner.context_generation;scene_run(40,25);scene_check("owner_lifetime_changed",survivor,"CANCELLED","RECOVERY_LIFETIME_CHANGED",0,0,1);
+    ++automatic_runtime.life.owner.context_generation;scene_run(40,25);scene_check("owner_lifetime_changed",survivor,"CANCELLED","RECOVERY_DEFERRED_AUTHORITY_CHANGED",0,0,1);
     /* Vanilla empties the standard weapons (death shape), then they return (stood up). */
     recovery_scene(1,1,HF_SESSION_HOST);empty_support(1,1);
     {uint32_t primary=u32(fixture(0x70000300,48)),secondary=u32(fixture(0x70000300,48)+4);
@@ -96,7 +96,7 @@ int main(void)
     recovery_scene(1,1,HF_SESSION_HOST);empty_support(1,1);scene_run(1,25);
     fixture(BASE+0x144024,7)[0]^=1;scene_run(60,100);
     scene_check("persistently_unreadable_6s_still_waiting",survivor,"ATTACH","WAIT_RECOVERY_READ_UNKNOWN",0,0,1);
-    scene_run(60,100);scene_check("persistently_unreadable_12s_expired",survivor,"CANCELLED","RECOVERY_RESTORE_WAIT_EXPIRED",0,0,1);
+    scene_run(60,100);scene_check("persistently_unreadable_12s_waiting",survivor,"ATTACH","WAIT_RECOVERY_READ_UNKNOWN",0,0,1);
     fixture(BASE+0x144024,7)[0]^=1;
     /* After the restore effect is consumed the wait no longer applies: an unreadable verification stays terminal (uss_recovery covers it). */
     /* The player presses the support/dedicated key while recovery is about to restore: the input gate refuses three times BEFORE any
@@ -104,10 +104,10 @@ int main(void)
     recovery_scene(1,1,HF_SESSION_HOST);empty_support(1,1);recovery.native.input_clear=scene_input_clear;input_refusals_left=3;
     scene_run(1,25);scene_run(80,25);input_refusals_left=0;
     scene_check("key_edge_refuses_restore_three_times",survivor,"COMPLETE","LONE_RECOVERY_COMPLETE",2,102,0);
-    /* The same refusal that never clears: it waits out the pre-effect bound and stops with no native call. */
+    /* The same refusal that never clears stays deferred without entering a native call. */
     recovery_scene(1,1,HF_SESSION_HOST);empty_support(1,1);recovery.native.input_clear=scene_input_clear;input_refusals_left=UINT_MAX;
     scene_run(1,25);scene_run(130,100);input_refusals_left=0;
-    scene_check("key_edge_never_clears_12s",survivor,"CANCELLED","RECOVERY_RESTORE_WAIT_EXPIRED",0,0,1);
+    scene_check("key_edge_never_clears_12s",survivor,"ATTACH","WAIT_RECOVERY_RESTORE_REFUSED_BEFORE_ENTRY",0,0,1);
     /* A restore whose native call WAS entered and then refused is consumed and terminal: it is never retried. */
     recovery_scene(1,1,HF_SESSION_HOST);empty_support(1,1);scene_run(1,25);recovery_fail=1;scene_run(80,25);recovery_fail=0;
     scene_check("restore_entered_then_refused",survivor,"CANCELLED","SURVIVOR_RESTORE_FAILED",1,0,1);
@@ -122,7 +122,7 @@ int main(void)
      for(i=0;i<40 && recovery.work.phase!=USS_RECOVERY_COMPLETE && recovery.work.phase!=USS_RECOVERY_CANCELLED;++i){
         replacement_now+=25;recovery_callback(MOD,0,recovery_callback_user);}
      printf("SCENARIO policy_blip_mid_recovery guard_bumped=%u ",(unsigned)(automatic_runtime.life.owner.guard_generation!=guard));
-     scene_check("policy_blip_mid_recovery_state",survivor,"CANCELLED","RECOVERY_LIFETIME_CHANGED",0,0,1);}
+     scene_check("policy_blip_mid_recovery_state",survivor,"CANCELLED","RECOVERY_DEFERRED_AUTHORITY_CHANGED",0,0,1);}
     puts("Recovery interruption scenes printed PASS");
     return 0;
 }

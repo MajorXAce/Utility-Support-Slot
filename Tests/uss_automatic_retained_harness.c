@@ -1,8 +1,15 @@
 #include "../src/uss_automatic_native.h"
 #define USS_REPLACEMENT_ADAPTER_TEST_MAIN adapter_regressions
 #include "replacement_adapter_harness.c"
+#ifdef USS_APP_STORAGE_FIXTURE
+#define automatic_runtime (candidate_app.formation)
+#define automatic_formation (candidate_app.native)
+#define automatic_controller (candidate_app.automatic)
+#define automatic_native (candidate_app.replacement)
+#else
 static UssFormationRuntime automatic_runtime;static UssFormationNative automatic_formation;
 static UssAutomaticController automatic_controller;static UssAutomaticNative automatic_native;
+#endif
 static unsigned automatic_pickup;
 static int automatic_pickup_option(void* user,UssPickupPolicy* out)
 {(void)user;out->known=1;out->switch_on_pickup=automatic_pickup;return 1;}

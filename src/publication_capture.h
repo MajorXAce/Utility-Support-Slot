@@ -77,12 +77,17 @@ static int capture_lookup(UssCaptureReader* reader,uintptr_t at,uint32_t key,uin
 static int capture_mapping(UssCaptureReader* reader,uintptr_t mapping,uint32_t entity,
                             unsigned char descriptor[24],uint32_t* wire)
 {
-    uint32_t forward,reverse;unsigned char again[24];
-    return publication_id(entity) && capture_lookup(reader,mapping+0xF1AEB0,entity,&forward)==1 &&
-        forward<=1048576 && capture_bytes(reader,mapping+0xF32F18+(uintptr_t)forward*24,descriptor,24,0) &&
-        u32(descriptor+8)==entity && (*wire=u32(descriptor+16))<=32766 &&
-        capture_lookup(reader,mapping+0xF22EC8,*wire,&reverse)==1 && reverse<=1048576 &&
-        capture_bytes(reader,mapping+0xF32F18+(uintptr_t)reverse*24,again,24,0) && !memcmp(descriptor,again,24);
+    uint32_t forward,reverse,candidate_wire;unsigned char candidate[24],again[24];uint64_t forward_at,reverse_at;
+    if(!reader->layout_valid || !publication_id(entity) ||
+        !address_ok(mapping,0xF22EC8+20) ||
+        capture_lookup(reader,mapping+0xF1AEB0,entity,&forward)!=1 || forward>1048576 ||
+        !eel_record_address(mapping,reader->records_displacement,forward,&forward_at) ||
+        !capture_bytes(reader,(uintptr_t)forward_at,candidate,24,0) || u32(candidate+8)!=entity ||
+        (candidate_wire=u32(candidate+16))>32766 ||
+        capture_lookup(reader,mapping+0xF22EC8,candidate_wire,&reverse)!=1 || reverse>1048576 ||
+        !eel_record_address(mapping,reader->records_displacement,reverse,&reverse_at) ||
+        !capture_bytes(reader,(uintptr_t)reverse_at,again,24,0) || memcmp(candidate,again,24))return 0;
+    memcpy(descriptor,candidate,24);*wire=candidate_wire;return 1;
 }
 typedef struct UssLoneCaptureContext {uint32_t target,outgoing;} UssLoneCaptureContext;
 /* Only the explicit lone entry opts into survivor/outgoing validation. Ordinary
@@ -222,15 +227,15 @@ static int capture_publication_internal(const UssCaptureProducer* producer,UssPu
         !capture_pin(&reader,reader.game+0x144024,state_load,7))goto done;}
     if(!capture_dispatch(&reader,session))goto done;
     reader.memory.stage="CAPTURE_MEMBERS";
-    if(!capture_pointer(&reader,reader.game+0x346BF98,&mapping,0) ||
+    if(!capture_layout_begin(&reader) || !capture_pointer(&reader,reader.game+0x346BF98,&mapping,0) ||
         !capture_mapping(&reader,mapping,owner.avatar,descriptor,&result.wires[0]) ||
         !capture_members_internal(&reader,&input,&owner,mapping,result.wires,lone))goto done;
     for(i=0;i<sizeof(capture_pins)/sizeof(capture_pins[0]);++i) {
         const UssCapturePin* pin=&capture_pins[i];
-        if(!pin->exe && !capture_pin(&reader,reader.game+pin->rva,pin->bytes,pin->size))goto done;
+        if(!pin->exe && !capture_game_pin(&reader,pin))goto done;
     }
     reader.memory.stage="CAPTURE_FINAL";
-    if(!inventory_sample(&reader.memory,&after) || memcmp(&owner,&after,sizeof(owner)) ||
+    if(!capture_layout_final(&reader) || !inventory_sample(&reader.memory,&after) || memcmp(&owner,&after,sizeof(owner)) ||
         !capture_peers(&reader,session,&after_peers) || peers.size!=after_peers.size ||
         memcmp(peers.context,after_peers.context,peers.size) ||
         !capture_pointer(&reader,reader.game+0x347CEF0,&end_base,0) || end_base!=session ||

@@ -5,11 +5,15 @@
 #include "publication_state.h"
 #include "capture_platform.h"
 #include "capture_pins.h"
+#include "entity_layout.h"
 typedef struct UssCaptureReader {
     Reader memory;
     const UssCapturePlatform* platform;
     uintptr_t game,exe;
     size_t game_size,exe_size;
+    int32_t records_displacement;
+    unsigned layout_valid,layout_recheck,layout_site;
+    unsigned char layout_code[8][20];
 } UssCaptureReader;
 typedef struct UssCaptureImage {
     unsigned char dos[64],header[24],optional[64],sections[96*40];
@@ -46,6 +50,36 @@ static int capture_bytes(UssCaptureReader* reader,uintptr_t address,void* out,si
     }
     return !checked || (capture_query(reader,address,&after) && !memcmp(&before,&after,sizeof(before)));
 }
+/* Current instructions are observations, not SDK read_code-normalized disk pins.
+ * An owner-local begin/final pair brackets all mappings; no cross-callback cache. */
+static int capture_layout_read(void* user,uint64_t address,void* out,unsigned size)
+{
+    UssCaptureReader* r=(UssCaptureReader*)user;UssCapturePage before,after;
+    unsigned site=r->layout_site++;
+    if(site>=8 || address<r->game || address-r->game>=r->game_size || size>r->game_size-(address-r->game) ||
+        !r->platform || !capture_query(r,(uintptr_t)address,&before) ||
+        !capture_page_executable(&before,r->game,(uintptr_t)address,size) ||
+        !capture_bytes(r,(uintptr_t)address,out,size,0) ||
+        !capture_query(r,(uintptr_t)address,&after) || memcmp(&before,&after,sizeof(before)))return 0;
+    if(r->layout_recheck)return !memcmp(out,r->layout_code[site],size);
+    memcpy(r->layout_code[site],out,size);return 1;
+}
+static int capture_layout_begin(UssCaptureReader* r)
+{
+    int32_t displacement;
+    r->layout_valid=0;r->layout_recheck=0;r->layout_site=0;
+    if(!eel_records(capture_layout_read,r,r->game,r->game_size,&displacement))return 0;
+    r->records_displacement=displacement;r->layout_valid=1;return 1;
+}
+static int capture_layout_final(UssCaptureReader* r)
+{
+    int32_t displacement;uintptr_t base;size_t size;
+    if(!r->layout_valid)return 0;
+    r->layout_recheck=1;r->layout_site=0;r->layout_valid=0;
+    if(!eel_records(capture_layout_read,r,r->game,r->game_size,&displacement) || displacement!=r->records_displacement)return 0;
+    base=r->memory.api->module_base("game.dll",&size);
+    return base==r->game && size==r->game_size;
+}
 static int capture_pointer(UssCaptureReader* reader,uintptr_t at,uintptr_t* out,unsigned checked)
 {
     return capture_bytes(reader,at,out,8,checked) && address_ok(*out,1) && *out%8==0;
@@ -59,6 +93,21 @@ static int capture_pin(UssCaptureReader* reader,uintptr_t at,const unsigned char
         done+=chunk;
     }
     return 1;
+}
+/* One retained whole-function pin contains the source-qualified ET_REC24 field.
+ * Build its exact expected current immediate from the SAME observed layout.
+ * Every other instruction byte still compares byte-for-byte. */
+static int capture_game_pin(UssCaptureReader* reader,const UssCapturePin* pin)
+{
+    unsigned char expected[256];int64_t numerator;int32_t raw;
+    if(pin->rva!=0xFD9A40)return capture_pin(reader,reader->game+pin->rva,pin->bytes,pin->size);
+    if(!reader->layout_valid || pin->exe || pin->size>sizeof(expected) || pin->size<0xA1 ||
+        memcmp(pin->bytes+0x9A,(const unsigned char[]){0x04,0x48,0x05},3) ||
+        u32(pin->bytes+0x9D)!=0xA21F7)return 0;
+    numerator=(int64_t)reader->records_displacement+16;
+    if(numerator%24 || numerator/24<INT32_MIN || numerator/24>INT32_MAX)return 0;
+    raw=(int32_t)(numerator/24);memcpy(expected,pin->bytes,pin->size);memcpy(expected+0x9D,&raw,4);
+    return capture_pin(reader,reader->game+pin->rva,expected,pin->size);
 }
 static int capture_image(UssCaptureReader* reader,UssCaptureImage* image)
 {

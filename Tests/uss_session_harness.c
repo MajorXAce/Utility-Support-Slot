@@ -20,7 +20,7 @@ static void inject_stopped_actor(void)
 }
 static void new_avatar_graph(void)
 {
-    unsigned i;put32(fixture(0x20000000+0xf31ad8,24)+8,23);
+    unsigned i;put32(fixture(fixture_avatar_record,24)+8,23);
     put32(fixture(0x70000100,8),23);put32(fixture(0x70000400,8),23);put32(fixture(0x80001000,8),23);
     put32(fixture(0x80002008,4),23);put32(fixture(ACTION_MANAGER+0x53dcd0,32),23);
     for(i=0;i<3;++i)if(u32(fixture(0x70000700,144)+i*48+4)==22)put32(fixture(0x70000700,144)+i*48+4,23);

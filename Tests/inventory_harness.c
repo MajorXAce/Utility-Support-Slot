@@ -7,8 +7,13 @@
 #endif
 typedef struct Segment { uintptr_t at; size_t n; unsigned char data[USS_FIXTURE_BYTES]; } Segment;
 #ifndef USS_FIXTURE_SEGMENTS
-#define USS_FIXTURE_SEGMENTS 40
+#define USS_FIXTURE_SEGMENTS 64
 #endif
+/* The avatar owner is an alias inside EntityManager, not independent storage. */
+#ifndef USS_FIXTURE_RECORDS
+#define USS_FIXTURE_RECORDS 0xF32F18
+#endif
+static uintptr_t fixture_avatar_record;
 static Segment segments[USS_FIXTURE_SEGMENTS];
 static unsigned used,reads,fail_at,change_at,logs,subscribes;
 static HfApi fake;
@@ -61,7 +66,7 @@ static void setup(void)
     unsigned i,j;unsigned char *b,*h;uintptr_t roots[]={0x20000000,0x30000000,0x40000000,0x50000000,0x60000000};
     used=reads=fail_at=change_at=logs=subscribes=session_calls=change_session=0;
     module_calls=module_change=module_small=module_nobase=initial_role=0;listener=NULL;registration_ok=1;
-    changing_kind=kind_reads=0;
+    changing_kind=kind_reads=0;fixture_avatar_record=roots[0]-0x1440+USS_FIXTURE_RECORDS;
     atomic_store(&attempt,0);memset(&fake,0,sizeof(fake));
     fake.version=HF_MOD_SDK_VERSION;fake.size=(uint32_t)sizeof(fake);fake.read=fake_read;fake.module_base=module;
     fake.game_state=game_state;fake.log=log_line;fake.build_id=build_id;fake.session=session;fake.subscribe=subscribe;
@@ -70,10 +75,10 @@ static void setup(void)
         put32(b+3,targets[i]-rvas[i]-7);putptr(segment(BASE+targets[i],8),roots[i]);}
     put32(segment(roots[1]+0x3A8,4),11);
     table(roots[0]+0xF21A88,0x70000000,11);
-    b=segment(roots[0]+0xF31AD8,24);put32(b,123);put32(b+8,22);put32(b+12,33);put32(b+16,5);put32(b+20,1);
+    b=segment(fixture_avatar_record,24);put32(b,123);put32(b+8,22);put32(b+12,33);put32(b+16,5);put32(b+20,1);
     table(roots[2]+40,0x70000100,22);
     b=segment(roots[2]+64,24);putptr(b,0x70000200);putptr(b+16,0x70000300);
-    putptr(segment(0x70000200,8),roots[0]+0xF31AD8);
+    putptr(segment(0x70000200,8),fixture_avatar_record);
     b=segment(0x70000300,48);put32(b,101);put32(b+8,UINT32_MAX);put32(b+28,0);
     table(roots[3]+0x30,0x70000400,22);putptr(segment(roots[3]+0x60,8),0x70000500);put32(segment(0x70000500,4),101);
     h=segment(roots[4],72);put32(h,1);put32(h+12,1);putptr(h+56,0x70000600);putptr(h+64,0x70000700);
@@ -82,6 +87,12 @@ static void setup(void)
     b=segment(0x70000800,8);put32(b,101);put32(b+4,0);
     putptr(segment(0x70000600,8),0x70000900);b=segment(0x70000900,24);put32(b,987);put32(b+8,101);
     put32(segment(0x70000700,20)+12,2);
+    putptr(segment(BASE+0x346BF98,8),roots[0]-0x1440);
+    for(i=0;i<8;++i){const EelSite* site=&eel_sites[i];
+        int32_t raw=(USS_FIXTURE_RECORDS+site->add)/(int32_t)site->scale;
+        assert((int64_t)raw*site->scale-site->add==USS_FIXTURE_RECORDS);
+        b=segment(BASE+site->rva,site->size+4);memcpy(b,site->code,site->size);memcpy(b+site->size,&raw,4);
+    }
 }
 static int sample(Inventory* out){Reader r={0};int ok;r.api=&fake;ok=inventory_sample(&r,out);last_reader=r;assert(r.calls<=2165 && r.bytes<=20000);return ok;}
 static unsigned char* fixture(uintptr_t at,size_t length)
@@ -200,7 +211,7 @@ int main(void)
     setup();assert(sample(&out));assert(out.avatar==22 && out.slots[0]==101 && out.held==101);total=reads;
     /* First graph reaches its occupied held predicate; fail the next graph's
      * first root read. Prior predicate evidence must not survive that boundary. */
-    setup();fail_at=5+(total-5)/2+1;assert(!sample(&out));
+    setup();fail_at=14+(total-23)/2+1;assert(!sample(&out));
     assert(last_reader.pass==2 && !strcmp(last_reader.stage,"MANAGER_ROOTS") && last_reader.slot==-1);
     assert(last_reader.predicate_valid==0 && last_reader.expected_entity==0 &&
            last_reader.observed_entity==0 && last_reader.observed_kind==0);
@@ -212,9 +223,9 @@ int main(void)
     setup();for(i=0;i<used;++i)if(segments[i].at==0x70000300){unsigned k;for(k=0;k<4;++k)put32(segments[i].data+4*k,101);}assert(sample(&out));
     setup();put32(segment(0x70000A00,24)+8,23);for(i=0;i<used;++i)if(segments[i].at==0x70000200)putptr(segments[i].data,0x70000A00);assert(!sample(&out));
     setup();for(i=0;i<used;++i)if(segments[i].at==0x60000000)put32(segments[i].data+12,16385);assert(!sample(&out));
-    setup();for(i=0;i<used;++i)if(segments[i].at==0x20000000+0xF31AD8)put32(segments[i].data+8,0);assert(!sample(&out));
+    setup();for(i=0;i<used;++i)if(segments[i].at==fixture_avatar_record)put32(segments[i].data+8,0);assert(!sample(&out));
     setup();for(i=0;i<used;++i)if(segments[i].at==0x70000900)put32(segments[i].data+8,102);assert(!sample(&out));
-    assert(!strcmp(last_reader.stage,"WEAPON_PREDICATE") && last_reader.slot==0 && last_reader.predicate_valid && last_reader.observed_entity==102 && last_reader.calls==30 && last_reader.bytes==580);
+    assert(!strcmp(last_reader.stage,"WEAPON_PREDICATE") && last_reader.slot==0 && last_reader.predicate_valid && last_reader.observed_entity==102 && last_reader.calls==39 && last_reader.bytes==674);
     /* The identical footprint also occurs with secondary/support first occupied. */
     for(i=0;i<3;++i) {
         unsigned j;setup();

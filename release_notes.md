@@ -1,6 +1,6 @@
-A menu compatibility update for the HellForge version.
+A compatibility update for HellForge 0.5.
 
-- Added support for the older Lua Mod Options Menu and Mod Bindings Menu.
-- Fixed cases where USS could interfere with the MODS tab when a menu was unavailable.
-- Improved response to quick binding presses.
-- If neither menu can be used, USS uses Default controls. Your saved settings are kept.
+- Fixed pairing failing on HellForge 0.5, and updated HUD compatibility.
+- Improved reliability of swapping, pairing, and recovery.
+
+This update has not had a full multiplayer or recovery test.

@@ -57,9 +57,11 @@ static int uss_replacement_read_origin(const UssReplacementProducer* p,UssReplac
         memcmp(&before,p->life,sizeof(before)) || memcmp(&original_flags,p->flags,sizeof(original_flags)))return 0;
     {UssCaptureReader mapping_reader={0};Inventory final_inventory;unsigned i;
         uint32_t roles[4]={current.inventory.avatar,current.inventory.slots[0],before.owner.utility.entity,before.owner.ordinary.entity};
-        mapping_reader.memory=budget;
+        mapping_reader.memory=budget;mapping_reader.platform=&p->platform;
+        mapping_reader.game=p->api->module_base("game.dll",&mapping_reader.game_size);
+        if(!capture_layout_begin(&mapping_reader))return 0;
         for(i=0;i<4;++i)if(!capture_mapping(&mapping_reader,current.context.mapping,roles[i],result.descriptors[i],&result.wires[i]))return 0;
-        if(memcmp(result.descriptors[2],current.utility.descriptor,24) || memcmp(result.descriptors[3],current.ordinary.descriptor,24) ||
+        if(!capture_layout_final(&mapping_reader) || memcmp(result.descriptors[2],current.utility.descriptor,24) || memcmp(result.descriptors[3],current.ordinary.descriptor,24) ||
             !inventory_sample(&mapping_reader.memory,&final_inventory) || memcmp(&final_inventory,&current.inventory,sizeof(final_inventory)) ||
             memcmp(&before,p->life,sizeof(before)) || memcmp(&original_flags,p->flags,sizeof(original_flags)))return 0;
     }
@@ -97,9 +99,10 @@ static int replacement_capture_lifetime(const UssReplacementProducer* p,uint64_t
  * final_context retain all ownership/header/row checks and module revalidation. */
 static int replacement_inventory_final(UssCaptureReader* reader,const Inventory* expected)
 {
-    uintptr_t globals[5],end_base;size_t end_size;Inventory current;
+    uintptr_t globals[5],end_base,entity_manager;size_t end_size;Inventory current;
     if(!resolve(&reader->memory,reader->game,reader->game_size,globals) ||
-        !graph(&reader->memory,globals,&current) || memcmp(expected,&current,sizeof(current)))return 0;
+        !get_ptr(&reader->memory,reader->game+0x346BF98,&entity_manager) ||
+        !graph(&reader->memory,globals,&current,entity_manager,reader->records_displacement) || memcmp(expected,&current,sizeof(current)))return 0;
     end_base=reader->memory.api->module_base("game.dll",&end_size);
     return final_context(&reader->memory,expected,&current,reader->game,end_base,reader->game_size,end_size);
 }
@@ -196,6 +199,7 @@ static int uss_replacement_capture(const UssReplacementProducer* p,unsigned entr
     if(entry && (!work.admitted || !replacement_entry_ready(&work,&result.snapshot,start) ||
         work.stage<USS_REPLACE_RECOVER || work.stage>USS_REPLACE_RETAINED_TICK || work.stage==USS_REPLACE_HANDOVER))goto done;
     mapping=scope.mapping;
+    if(!capture_layout_begin(&reader))goto done;
     if(!capture_mapping(&reader,mapping,life.owner.context.local.avatar,result.descriptors[0],&result.wires[0]) ||
         !capture_mapping(&reader,mapping,result.snapshot.bundle.current.inventory.slots[0],result.descriptors[1],&result.wires[1]))goto done;
     if(memcmp(result.descriptors[1],result.snapshot.bundle.current.inventory.identities[0],8) || !(result.descriptors[1][20]&1))goto done;
@@ -219,7 +223,7 @@ static int uss_replacement_capture(const UssReplacementProducer* p,unsigned entr
         reader.memory.evidence=result.fingerprint;reader.memory.evidence_size=observed_size;
         for(i=0;i<sizeof(capture_pins)/sizeof(capture_pins[0]);++i) {
             const UssCapturePin* pin=&capture_pins[i];
-            if(!pin->exe && !capture_pin(&reader,reader.game+pin->rva,pin->bytes,pin->size))goto done;
+            if(!pin->exe && !capture_game_pin(&reader,pin))goto done;
         }
     }
     if(!replacement_inventory_final(&reader,&result.snapshot.bundle.current.inventory) ||
@@ -234,7 +238,7 @@ static int uss_replacement_capture(const UssReplacementProducer* p,unsigned entr
         if(!capture_mapping(&reader,mapping,entity,descriptor,&wire) || wire!=result.wires[i] ||
             memcmp(descriptor,result.descriptors[i],24))goto done;
     }
-    if(!capture_bytes(&reader,reader.game+0x348456C,&empty_wire,4,0) || empty_wire!=sentinel ||
+    if(!capture_layout_final(&reader) || !capture_bytes(&reader,reader.game+0x348456C,&empty_wire,4,0) || empty_wire!=sentinel ||
         !core_scope(&reader.memory,p->api,p->mod,&after_scope) || memcmp(&scope,&after_scope,sizeof(scope)))goto done;
     end=p->clock_ms(p->user);
     if(end<start || !replacement_capture_lifetime(p,end) || (entry && !replacement_entry_ready(&work,&result.snapshot,end)) ||

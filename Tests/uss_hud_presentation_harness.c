@@ -57,7 +57,7 @@ static int presentation_fixture_invoke(void* user,UssHudPresentationEffect effec
 static void presentation_widget(unsigned utility)
 {
     unsigned char* text=(unsigned char*)present_widget()+0x13a8;unsigned char* icon=(unsigned char*)present_widget()+0x1cc0;
-    unsigned char* resource=weapon_assets+(0x17c+utility)*0x38;
+    unsigned char* resource=weapon_assets+(USS_HUD_FIXTURE_BIAS+utility)*0x38;
     put32(text,3u<<18);putptr(text+0xf8,PRESENT_CONTEXT);memcpy(text+0x150,resource+0x30,8);
     put32(icon,7u<<18);memcpy(icon+0x110,resource+8,4);put32((unsigned char*)present_widget()+0x27cc,1);
     put32(hud_allocation+0x394b44,0x3f800000);put32(hud_allocation+0x394fe0,1);
@@ -79,7 +79,7 @@ static void presentation_scene(void)
     fake.read=presentation_fixture_read;automatic_formation.platform.query=presentation_fixture_query;
     hud.presentation.invoke=presentation_fixture_invoke;present_calls=present_fail=present_no_effect=present_change=present_bad_page=present_invalid_dimensions=0;
     sized_width=sized_height=0;memset(present_kinds,0,sizeof(present_kinds));
-    hud_record(102,1,1);presentation_widget(0);memcpy(&expected_name,weapon_assets+(0x17c+1)*0x38+0x30,8);
+    hud_record(102,1,1);presentation_widget(0);memcpy(&expected_name,weapon_assets+(USS_HUD_FIXTURE_BIAS+1)*0x38+0x30,8);
     uss_hud_runtime_completed_pair(&hud);assert(hud.popup.active); /* Confirmed initial utility acquisition, final inventory. */
 }
 #ifndef USS_HUD_PRESENTATION_TEST_MAIN
@@ -158,7 +158,7 @@ int USS_HUD_PRESENTATION_TEST_MAIN(void)
     /* Ordinary acquisition with pickup No: utility was restored, so the wrong
      * visible utility+1 is corrected to the actual new ordinary member. */
     presentation_scene();hud.popup.active=0;solo_incoming(0,3,0,0);
-    hud_record(103,1,0);presentation_widget(1);memcpy(&expected_name,weapon_assets+0x17c*0x38+0x30,8);
+    hud_record(103,1,0);presentation_widget(1);memcpy(&expected_name,weapon_assets+USS_HUD_FIXTURE_BIAS*0x38+0x30,8);
     uss_hud_runtime_completed_pair(&hud);assert(hud.popup.active && hud.popup.wait_pending && hud.popup.presented==104);
     replacement_now+=25;uss_hud_runtime_poll(&hud,replacement_now);assert(hud.popup.active && !present_calls);
     hud_word_at_set(20,1);replacement_now+=25;uss_hud_runtime_poll(&hud,replacement_now);
@@ -168,7 +168,7 @@ int USS_HUD_PRESENTATION_TEST_MAIN(void)
     for(unsigned selected=1;selected<=2;++selected)for(unsigned active=0;active<2;++active){
         presentation_scene();hud.popup.active=0;solo_incoming(0,selected,0,active);
         hud_record(103,1,1);presentation_widget(1);
-        memcpy(&expected_name,weapon_assets+0x17c*0x38+0x30,8);
+        memcpy(&expected_name,weapon_assets+USS_HUD_FIXTURE_BIAS*0x38+0x30,8);
         uss_hud_runtime_completed_pair(&hud);
         assert(hud.popup.active && hud.popup.presented==104 && hud.popup.displayed==103);
         memcpy(prior,hud_allocation+0x394cd8,40);
